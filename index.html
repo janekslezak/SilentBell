@@ -1,0 +1,102 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="theme-color" content="#111820" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+  <meta name="apple-mobile-web-app-title" content="Silent Bell 침묵의 종" />
+  <title>Silent Bell 침묵의 종</title>
+  <link rel="manifest" href="manifest.json" />
+  <link rel="stylesheet" href="style.css" />
+  <link rel="apple-touch-icon" href="icon-192.png" />
+  <script>
+    if ('serviceWorker' in navigator)
+      navigator.serviceWorker.register('/sw.js');
+  </script>
+</head>
+<body>
+  <nav>
+    <button class="nav-btn active" data-view="timer">Timer</button>
+    <button class="nav-btn" data-view="log">Log</button>
+    <button class="nav-btn" data-view="settings">Settings</button>
+  </nav>
+
+  <!-- TIMER VIEW -->
+  <section id="view-timer" class="view active">
+    <div id="display">00:00</div>
+    <div id="status">Ready</div>
+
+    <div class="duration-presets">
+      <button class="preset" data-min="5">5m</button>
+      <button class="preset" data-min="10">10m</button>
+      <button class="preset" data-min="20">20m</button>
+      <button class="preset" data-min="30">30m</button>
+      <button class="preset" data-min="45">45m</button>
+      <button class="preset" data-min="60">60m</button>
+    </div>
+
+    <div class="custom-row">
+      <input type="number" id="custom-min" placeholder="Custom min" min="1" max="180" />
+    </div>
+
+    <div class="field-group">
+      <span class="field-label">Sound</span>
+      <select id="sound-select">
+        <option value="bowl">Bell</option>
+        <option value="chugpi">Chugpi (죽비)</option>
+        <option value="none">Silent</option>
+      </select>
+    </div>
+
+    <div class="field-group">
+      <span class="field-label">Interval bells every</span>
+      <select id="interval-select">
+        <option value="0">None</option>
+        <option value="5">5 min</option>
+        <option value="10">10 min</option>
+        <option value="15">15 min</option>
+        <option value="20">20 min</option>
+      </select>
+    </div>
+
+    <div class="controls">
+      <button id="btn-start">Start</button>
+      <button id="btn-stop" disabled>Stop</button>
+    </div>
+  </section>
+
+  <!-- LOG VIEW -->
+  <section id="view-log" class="view">
+    <h2>Session Log</h2>
+    <div id="log-summary"></div>
+    <ul id="log-list"></ul>
+    <button id="btn-export">Export CSV</button>
+    <button id="btn-clear-log">Clear Log</button>
+  </section>
+
+  <!-- SETTINGS VIEW -->
+  <section id="view-settings" class="view">
+    <h2>Settings</h2>
+    <div class="field-group">
+      <span class="field-label">Default duration (min)</span>
+      <input type="number" id="default-duration" min="1" max="180" value="20" />
+    </div>
+    <div class="field-group">
+      <span class="field-label">Default sound</span>
+      <select id="default-sound">
+        <option value="bowl">Bell</option>
+        <option value="chugpi">Chugpi (죽비)</option>
+        <option value="none">Silent</option>
+      </select>
+    </div>
+    <button id="btn-save-settings">Save</button>
+    <p id="settings-saved" style="display:none;color:#88c0d0">Saved ✓</p>
+  </section>
+
+  <script src="NoSleep.min.js"></script>
+  <script src="app.js"></script>
+</body>
+</html>
+

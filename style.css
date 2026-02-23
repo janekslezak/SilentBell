@@ -1,0 +1,209 @@
+:root {
+  --bg:      #111820;
+  --surface: #1a2232;
+  --accent:  #88c0d0;
+  --text:    #eceff4;
+  --muted:   #7b8fa1;
+  --danger:  #bf616a;
+  --radius:  12px;
+}
+
+* { box-sizing: border-box; margin: 0; padding: 0; }
+
+body {
+  font-family: system-ui, -apple-system, sans-serif;
+  background: var(--bg);
+  color: var(--text);
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+  max-width: 480px;
+  margin: 0 auto;
+  padding-bottom: 32px;
+}
+
+/* ── Nav ── */
+nav {
+  display: flex;
+  background: var(--surface);
+  border-bottom: 1px solid #2e3a4e;
+  position: sticky;
+  top: 0;
+  z-index: 10;
+}
+
+.nav-btn {
+  flex: 1;
+  padding: 16px 8px;
+  background: none;
+  border: none;
+  border-bottom: 2px solid transparent;
+  color: var(--muted);
+  font-size: 0.95rem;
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+  touch-action: manipulation;
+}
+
+.nav-btn.active {
+  color: var(--accent);
+  border-bottom: 2px solid var(--accent);
+}
+
+/* ── Views ── */
+.view { display: none; padding: 24px 20px; flex-direction: column; gap: 16px; }
+.view.active { display: flex; }
+
+/* ── Timer display ── */
+#display {
+  font-size: 5rem;
+  font-weight: 200;
+  text-align: center;
+  letter-spacing: 4px;
+  color: var(--accent);
+  margin: 16px 0 4px;
+  font-variant-numeric: tabular-nums;
+}
+
+#status {
+  text-align: center;
+  color: var(--muted);
+  font-size: 0.9rem;
+}
+
+/* ── Duration presets ── */
+.duration-presets {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  justify-content: center;
+}
+
+.preset {
+  padding: 11px 18px;
+  background: var(--surface);
+  border: 1px solid #2e3a4e;
+  border-radius: var(--radius);
+  color: var(--text);
+  font-size: 0.95rem;
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+  touch-action: manipulation;
+  transition: border-color 0.15s, color 0.15s;
+}
+
+.preset.selected,
+.preset:active {
+  border-color: var(--accent);
+  color: var(--accent);
+}
+
+/* ── Field groups ── */
+.field-group {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.field-label {
+  font-size: 0.85rem;
+  color: var(--muted);
+  padding-left: 2px;
+}
+
+/* ── Inputs & Selects ── */
+input[type="number"],
+select {
+  width: 100%;
+  padding: 13px 14px;
+  background: var(--surface);
+  border: 1px solid #2e3a4e;
+  border-radius: var(--radius);
+  color: var(--text);
+  font-size: 1rem;
+  font-family: inherit;
+  -webkit-appearance: none;
+  appearance: none;
+  cursor: pointer;
+  touch-action: manipulation;
+}
+
+.custom-row input[type="number"] {
+  text-align: center;
+}
+
+/* ── Controls ── */
+.controls {
+  display: flex;
+  gap: 12px;
+  margin-top: 8px;
+}
+
+.controls button {
+  flex: 1;
+  padding: 18px;
+  border: none;
+  border-radius: var(--radius);
+  font-size: 1.1rem;
+  font-family: inherit;
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+  touch-action: manipulation;
+  transition: opacity 0.15s;
+}
+
+#btn-start { background: var(--accent); color: var(--bg); font-weight: 600; }
+#btn-stop  { background: var(--danger); color: #fff; }
+button:disabled { opacity: 0.35; pointer-events: none; }
+
+/* ── Log ── */
+h2 { font-size: 1.1rem; font-weight: 400; color: var(--accent); }
+
+#log-summary {
+  background: var(--surface);
+  padding: 14px 16px;
+  border-radius: var(--radius);
+  font-size: 0.9rem;
+  line-height: 1.8;
+  color: var(--muted);
+}
+
+#log-list {
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+#log-list li {
+  background: var(--surface);
+  padding: 12px 14px;
+  border-radius: var(--radius);
+  font-size: 0.88rem;
+  line-height: 1.7;
+}
+
+.log-date   { color: var(--accent); font-weight: 500; }
+.log-detail { color: var(--muted); }
+
+/* ── Secondary buttons ── */
+#btn-export,
+#btn-clear-log,
+#btn-save-settings {
+  padding: 14px;
+  border: 1px solid #2e3a4e;
+  border-radius: var(--radius);
+  background: var(--surface);
+  color: var(--text);
+  font-size: 0.95rem;
+  font-family: inherit;
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+  touch-action: manipulation;
+}
+
+#btn-clear-log {
+  color: var(--danger);
+  border-color: var(--danger);
+}
+
