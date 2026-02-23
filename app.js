@@ -2,74 +2,78 @@
 
 const STRINGS = {
   en: {
-    app_title:          'Silent Bell',
-    nav_timer:          'Timer',
-    nav_log:            'Log',
-    nav_settings:       'Settings',
-    status_ready:       'Ready',
-    status_loading:     'Loading sound…',
-    status_meditating:  'Meditating…',
-    status_complete:    'Session complete 🙏',
-    status_stopped:     'Stopped early',
-    label_sound:        'Sound',
-    label_interval:     'Interval bells every',
-    sound_bell:         'Bell',
-    sound_chugpi:       'Korean 죽비 (Chugpi)',
-    sound_silent:       'Silent',
-    interval_none:      'None',
-    btn_start:          'Start',
-    btn_stop:           'Stop',
-    btn_loading:        'Loading…',
-    btn_export:         'Export CSV',
-    btn_clear:          'Clear Log',
-    btn_save:           'Save',
-    settings_duration:  'Default duration (min)',
-    settings_sound:     'Default sound',
-    settings_saved:     'Saved ✓',
+    app_title: 'Silent Bell',
+    nav_timer: 'Timer',
+    nav_log: 'Log',
+    nav_settings: 'Settings',
+    status_ready: 'Ready',
+    status_loading: 'Loading sound…',
+    status_meditating: 'Meditating…',
+    status_complete: 'Session complete 🙏',
+    status_stopped: 'Stopped early',
+    status_prepare: 'Prepare… {secs}s',
+    label_sound: 'Sound',
+    label_interval: 'Interval bells every',
+    sound_bell: 'Bell',
+    sound_chugpi: 'Jugbi 죽비',
+    sound_silent: 'Silent',
+    interval_none: 'None',
+    btn_start: 'Start',
+    btn_stop: 'Stop',
+    btn_loading: 'Loading…',
+    btn_export: 'Export CSV',
+    btn_clear: 'Clear Log',
+    btn_save: 'Save',
+    settings_duration: 'Default duration (min)',
+    settings_sound: 'Default sound',
+    settings_prepare: 'Prepare countdown (sec)',
+    settings_saved: 'Saved ✓',
     custom_placeholder: 'Custom min',
-    log_sessions:       'Sessions',
-    log_total:          'Total time',
-    log_completed:      'Completed',
-    log_planned:        'planned',
-    log_stopped:        '⚠ stopped early',
-    confirm_clear:      'Clear all session history?'
+    log_sessions: 'Sessions',
+    log_total: 'Total time',
+    log_completed: 'Completed',
+    log_planned: 'planned',
+    log_stopped: '⚠ stopped early',
+    confirm_clear: 'Clear all session history?'
   },
   pl: {
-    app_title:          'Dzwon Ciszy',
-    nav_timer:          'Timer',
-    nav_log:            'Dziennik',
-    nav_settings:       'Ustawienia',
-    status_ready:       'Gotowy',
-    status_loading:     'Ładowanie dźwięku…',
-    status_meditating:  'Medytacja…',
-    status_complete:    'Sesja zakończona 🙏',
-    status_stopped:     'Przerwano',
-    label_sound:        'Dźwięk',
-    label_interval:     'Dzwon co',
-    sound_bell:         'Dzwon',
-    sound_chugpi:       'Koreański 죽비 (Chugpi)',
-    sound_silent:       'Cicho',
-    interval_none:      'Brak',
-    btn_start:          'Start',
-    btn_stop:           'Stop',
-    btn_loading:        'Ładowanie…',
-    btn_export:         'Eksport CSV',
-    btn_clear:          'Wyczyść',
-    btn_save:           'Zapisz',
-    settings_duration:  'Domyślny czas (min)',
-    settings_sound:     'Domyślny dźwięk',
-    settings_saved:     'Zapisano ✓',
+    app_title: 'Dzwon Ciszy',
+    nav_timer: 'Timer',
+    nav_log: 'Dziennik',
+    nav_settings: 'Ustawienia',
+    status_ready: 'Gotowy',
+    status_loading: 'Ładowanie dźwięku…',
+    status_meditating: 'Medytacja…',
+    status_complete: 'Sesja zakończona 🙏',
+    status_stopped: 'Przerwano',
+    status_prepare: 'Przygotuj się… {secs}s',
+    label_sound: 'Dźwięk',
+    label_interval: 'Dzwon co',
+    sound_bell: 'Dzwon',
+    sound_chugpi: 'Jugbi 죽비',
+    sound_silent: 'Cicho',
+    interval_none: 'Brak',
+    btn_start: 'Start',
+    btn_stop: 'Stop',
+    btn_loading: 'Ładowanie…',
+    btn_export: 'Eksport CSV',
+    btn_clear: 'Wyczyść',
+    btn_save: 'Zapisz',
+    settings_duration: 'Domyślny czas (min)',
+    settings_sound: 'Domyślny dźwięk',
+    settings_prepare: 'Odliczanie przed startem (s)',
+    settings_saved: 'Zapisano ✓',
     custom_placeholder: 'Własny czas',
-    log_sessions:       'Sesje',
-    log_total:          'Łączny czas',
-    log_completed:      'Ukończone',
-    log_planned:        'zaplanowano',
-    log_stopped:        '⚠ przerwano',
-    confirm_clear:      'Wyczyścić historię sesji?'
+    log_sessions: 'Sesje',
+    log_total: 'Łączny czas',
+    log_completed: 'Ukończone',
+    log_planned: 'zaplanowano',
+    log_stopped: '⚠ przerwano',
+    confirm_clear: 'Wyczyścić historię sesji?'
   }
 };
 
-let currentLang  = localStorage.getItem('lang')  || 'en';
+let currentLang = localStorage.getItem('lang') || 'en';
 let currentTheme = localStorage.getItem('theme') || 'dark';
 
 function t(key) {
@@ -111,7 +115,7 @@ document.getElementById('btn-theme').addEventListener('click', () => {
 // ─── Audio Engine ────────────────────────────────────────────────
 
 let bellAudio = null;
-let noSleep   = null;
+let noSleep = null;
 
 async function initAudio() {
   if (bellAudio) return;
@@ -133,29 +137,52 @@ function playBell(timeSeconds = 0) {
 }
 
 function playChugpi(timeSeconds = 0) {
-  const AudioCtx = window.AudioContext || window.webkitAudioContext;
-  const ctx = new AudioCtx();
   setTimeout(() => {
-    const now     = ctx.currentTime;
-    const bufSize = ctx.sampleRate * 0.12;
-    const buf     = ctx.createBuffer(1, bufSize, ctx.sampleRate);
-    const data    = buf.getChannelData(0);
-    for (let i = 0; i < bufSize; i++)
-      data[i] = (Math.random() * 2 - 1) * Math.pow(1 - i / bufSize, 8);
-    const src    = ctx.createBufferSource();
-    src.buffer   = buf;
-    const filter = ctx.createBiquadFilter();
-    filter.type  = 'bandpass';
-    filter.frequency.value = 2200;
-    filter.Q.value         = 0.8;
-    const gain = ctx.createGain();
-    gain.gain.setValueAtTime(1.2, now);
-    gain.gain.exponentialRampToValueAtTime(0.001, now + 0.12);
-    src.connect(filter);
-    filter.connect(gain);
-    gain.connect(ctx.destination);
-    src.start(now);
-    src.stop(now + 0.15);
+    const AudioCtx = window.AudioContext || window.webkitAudioContext;
+    const ctx = new AudioCtx();
+    const now = ctx.currentTime;
+
+    // Layer 1: sharp crack
+    const crackSize = ctx.sampleRate * 0.08;
+    const crackBuf = ctx.createBuffer(1, crackSize, ctx.sampleRate);
+    const crackData = crackBuf.getChannelData(0);
+    for (let i = 0; i < crackSize; i++)
+      crackData[i] = (Math.random() * 2 - 1) * Math.pow(1 - i / crackSize, 4);
+    const crackSrc = ctx.createBufferSource();
+    crackSrc.buffer = crackBuf;
+    const crackFilter = ctx.createBiquadFilter();
+    crackFilter.type = 'bandpass';
+    crackFilter.frequency.value = 3500;
+    crackFilter.Q.value = 0.6;
+    const crackGain = ctx.createGain();
+    crackGain.gain.setValueAtTime(3.5, now);
+    crackGain.gain.exponentialRampToValueAtTime(0.001, now + 0.08);
+    crackSrc.connect(crackFilter);
+    crackFilter.connect(crackGain);
+    crackGain.connect(ctx.destination);
+    crackSrc.start(now);
+    crackSrc.stop(now + 0.08);
+
+    // Layer 2: woody resonance
+    const resonanceSize = ctx.sampleRate * 0.3;
+    const resBuf = ctx.createBuffer(1, resonanceSize, ctx.sampleRate);
+    const resData = resBuf.getChannelData(0);
+    for (let i = 0; i < resonanceSize; i++)
+      resData[i] = (Math.random() * 2 - 1) * Math.pow(1 - i / resonanceSize, 12);
+    const resSrc = ctx.createBufferSource();
+    resSrc.buffer = resBuf;
+    const resFilter = ctx.createBiquadFilter();
+    resFilter.type = 'bandpass';
+    resFilter.frequency.value = 900;
+    resFilter.Q.value = 1.2;
+    const resGain = ctx.createGain();
+    resGain.gain.setValueAtTime(2.0, now);
+    resGain.gain.exponentialRampToValueAtTime(0.001, now + 0.3);
+    resSrc.connect(resFilter);
+    resFilter.connect(resGain);
+    resGain.connect(ctx.destination);
+    resSrc.start(now);
+    resSrc.stop(now + 0.3);
   }, timeSeconds * 1000);
 }
 
@@ -167,8 +194,9 @@ function playSound(type, timeSeconds = 0) {
 
 function playStrokes(type, count, startDelay = 0) {
   if (type === 'none') return;
+  const interval = type === 'chugpi' ? 1.5 : 1.4;
   for (let i = 0; i < count; i++)
-    playSound(type, startDelay + i * 1.4);
+    playSound(type, startDelay + i * interval);
 }
 
 // ─── Meditation UI state ──────────────────────────────────────────
@@ -179,25 +207,27 @@ function setMeditating(active) {
 
 // ─── State ───────────────────────────────────────────────────────
 
-let timerInterval   = null;
-let sessionStart    = null;
-let endTimestamp    = null;
+let timerInterval = null;
+let countdownInterval = null;
+let sessionStart = null;
+let endTimestamp = null;
 let plannedDuration = 0;
-let intervalBellMs  = 0;
-let nextIntervalAt  = null;
-let currentSound    = 'bell';
+let intervalBellMs = 0;
+let nextIntervalAt = null;
+let currentSound = 'bell';
 let selectedMinutes = 20;
+let prepareSeconds = 10; // default countdown
 
 // ─── DOM ─────────────────────────────────────────────────────────
 
-const display        = document.getElementById('display');
-const statusEl       = document.getElementById('status');
-const btnStart       = document.getElementById('btn-start');
-const btnStop        = document.getElementById('btn-stop');
-const soundSelect    = document.getElementById('sound-select');
+const display = document.getElementById('display');
+const statusEl = document.getElementById('status');
+const btnStart = document.getElementById('btn-start');
+const btnStop = document.getElementById('btn-stop');
+const soundSelect = document.getElementById('sound-select');
 const intervalSelect = document.getElementById('interval-select');
-const customMin      = document.getElementById('custom-min');
-const presets        = document.querySelectorAll('.preset');
+const customMin = document.getElementById('custom-min');
+const presets = document.querySelectorAll('.preset');
 
 // ─── Navigation ──────────────────────────────────────────────────
 
@@ -216,12 +246,11 @@ document.querySelectorAll('.nav-btn').forEach(btn => {
 function selectPreset(min) {
   selectedMinutes = min;
   presets.forEach(p => p.classList.toggle('selected', +p.dataset.min === min));
-  customMin.value     = '';
+  customMin.value = '';
   display.textContent = formatTime(min * 60);
 }
 
 presets.forEach(p => p.addEventListener('click', () => selectPreset(+p.dataset.min)));
-
 customMin.addEventListener('input', () => {
   const v = parseInt(customMin.value);
   if (v > 0) {
@@ -240,49 +269,81 @@ function formatTime(secs) {
 }
 
 btnStart.addEventListener('click', async () => {
-  btnStart.disabled    = true;
+  btnStart.disabled = true;
   btnStart.textContent = t('btn_loading');
   statusEl.textContent = t('status_loading');
-
   try {
     await initAudio();
   } catch (e) {
     console.error('Failed to load bell.mp3:', e);
     statusEl.textContent = 'Failed to load bell.mp3';
-    btnStart.disabled    = false;
+    btnStart.disabled = false;
     btnStart.textContent = t('btn_start');
     return;
   }
-
   if (!noSleep && window.NoSleep) noSleep = new NoSleep();
   if (noSleep) noSleep.enable();
-
   btnStart.textContent = t('btn_start');
-  startSession();
+  startCountdown();
 });
 
 btnStop.addEventListener('click', stopSession);
 
+// ─── Prepare Countdown ───────────────────────────────────────────
+
+function startCountdown() {
+  currentSound = soundSelect.value;
+  let secsLeft = prepareSeconds;
+
+  if (secsLeft <= 0) {
+    startSession();
+    return;
+  }
+
+  btnStart.disabled = true;
+  btnStop.disabled = false;
+
+  function updateDisplay() {
+    statusEl.textContent = t('status_prepare').replace('{secs}', secsLeft);
+    display.textContent = formatTime(secsLeft);
+  }
+
+  updateDisplay();
+
+  countdownInterval = setInterval(() => {
+    secsLeft--;
+    if (secsLeft <= 0) {
+      clearInterval(countdownInterval);
+      countdownInterval = null;
+      startSession();
+    } else {
+      updateDisplay();
+    }
+  }, 1000);
+}
+
+// ─── Session ─────────────────────────────────────────────────────
+
 function startSession() {
-  currentSound    = soundSelect.value;
-  intervalBellMs  = +intervalSelect.value * 60 * 1000;
+  currentSound = soundSelect.value;
+  intervalBellMs = +intervalSelect.value * 60 * 1000;
   plannedDuration = selectedMinutes * 60;
-  sessionStart    = Date.now();
-  endTimestamp    = sessionStart + plannedDuration * 1000;
-  nextIntervalAt  = intervalBellMs > 0 ? sessionStart + intervalBellMs : null;
+  sessionStart = Date.now();
+  endTimestamp = sessionStart + plannedDuration * 1000;
+  nextIntervalAt = intervalBellMs > 0 ? sessionStart + intervalBellMs : null;
 
   if (currentSound === 'chugpi') playStrokes('chugpi', 3);
   else playStrokes(currentSound, 1);
 
   statusEl.textContent = t('status_meditating');
-  btnStart.disabled    = true;
-  btnStop.disabled     = false;
+  btnStart.disabled = true;
+  btnStop.disabled = false;
   setMeditating(true);
   timerInterval = setInterval(tick, 500);
 }
 
 function tick() {
-  const now       = Date.now();
+  const now = Date.now();
   const remaining = Math.max(0, Math.round((endTimestamp - now) / 1000));
   display.textContent = formatTime(remaining);
 
@@ -300,14 +361,26 @@ function tick() {
     playStrokes(currentSound, 3);
     saveSession(true);
     statusEl.textContent = t('status_complete');
-    btnStart.disabled    = false;
-    btnStop.disabled     = true;
+    btnStart.disabled = false;
+    btnStop.disabled = true;
     btnStart.textContent = t('btn_start');
-    display.textContent  = formatTime(plannedDuration);
+    display.textContent = formatTime(plannedDuration);
   }
 }
 
 function stopSession() {
+  // Cancel countdown if still running
+  if (countdownInterval) {
+    clearInterval(countdownInterval);
+    countdownInterval = null;
+    if (noSleep) noSleep.disable();
+    statusEl.textContent = t('status_ready');
+    btnStart.disabled = false;
+    btnStop.disabled = true;
+    display.textContent = formatTime(plannedDuration || selectedMinutes * 60);
+    return;
+  }
+
   if (!timerInterval) return;
   clearInterval(timerInterval);
   timerInterval = null;
@@ -316,10 +389,10 @@ function stopSession() {
   const actual = Math.round((Date.now() - sessionStart) / 1000);
   saveSession(false, actual);
   statusEl.textContent = t('status_stopped');
-  btnStart.disabled    = false;
-  btnStop.disabled     = true;
+  btnStart.disabled = false;
+  btnStop.disabled = true;
   btnStart.textContent = t('btn_start');
-  display.textContent  = formatTime(plannedDuration);
+  display.textContent = formatTime(plannedDuration);
 }
 
 // ─── Log ─────────────────────────────────────────────────────────
@@ -327,16 +400,16 @@ function stopSession() {
 function saveSession(completed, actualSecs = null) {
   const sessions = getSessions();
   sessions.unshift({
-    id:        Date.now(),
-    date:      new Date(sessionStart).toLocaleDateString(
-                 currentLang === 'pl' ? 'pl-PL' : 'en-GB'),
+    id: Date.now(),
+    date: new Date(sessionStart).toLocaleDateString(
+      currentLang === 'pl' ? 'pl-PL' : 'en-GB'),
     startTime: new Date(sessionStart).toLocaleTimeString('en-GB', {
-                 hour: '2-digit', minute: '2-digit'
-               }),
-    planned:   plannedDuration,
-    actual:    actualSecs !== null ? actualSecs : plannedDuration,
+      hour: '2-digit', minute: '2-digit'
+    }),
+    planned: plannedDuration,
+    actual: actualSecs !== null ? actualSecs : plannedDuration,
     completed,
-    sound:     currentSound
+    sound: currentSound
   });
   localStorage.setItem('meditation_log', JSON.stringify(sessions));
 }
@@ -353,25 +426,22 @@ function formatDuration(secs) {
 }
 
 function renderLog() {
-  const sessions  = getSessions();
+  const sessions = getSessions();
   const totalSecs = sessions.reduce((a, s) => a + s.actual, 0);
-  const totalH    = Math.floor(totalSecs / 3600);
-  const totalM    = Math.floor((totalSecs % 3600) / 60);
-
+  const totalH = Math.floor(totalSecs / 3600);
+  const totalM = Math.floor((totalSecs % 3600) / 60);
   document.getElementById('log-summary').innerHTML =
     `${t('log_sessions')}: <strong>${sessions.length}</strong> &nbsp;
      ${t('log_total')}: <strong>${totalH}h ${totalM}m</strong> &nbsp;
      ${t('log_completed')}: <strong>${sessions.filter(s => s.completed).length}</strong>`;
-
   document.getElementById('log-list').innerHTML = sessions.map(s => `
     <li>
       <div class="log-date">${s.date} &nbsp; ${s.startTime}</div>
       <div class="log-detail">
         ${formatDuration(s.actual)} / ${formatDuration(s.planned)} ${t('log_planned')}
-        ${!s.completed ? `&nbsp; ${t('log_stopped')}` : ''}
+        ${!s.completed ? ` &nbsp; ${t('log_stopped')}` : ''}
       </div>
-    </li>
-  `).join('');
+    </li>`).join('');
 }
 
 document.getElementById('btn-export').addEventListener('click', () => {
@@ -380,10 +450,10 @@ document.getElementById('btn-export').addEventListener('click', () => {
     ['Date', 'Start', 'Planned (s)', 'Actual (s)', 'Completed', 'Sound'],
     ...sessions.map(s => [s.date, s.startTime, s.planned, s.actual, s.completed, s.sound])
   ];
-  const csv  = rows.map(r => r.join(',')).join('\n');
+  const csv = rows.map(r => r.join(',')).join('\n');
   const blob = new Blob([csv], { type: 'text/csv' });
-  const a    = document.createElement('a');
-  a.href     = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
   a.download = 'meditation_log.csv';
   a.click();
 });
@@ -398,27 +468,40 @@ document.getElementById('btn-clear-log').addEventListener('click', () => {
 // ─── Settings ────────────────────────────────────────────────────
 
 const settingsDuration = document.getElementById('settings-duration');
-const settingsSound    = document.getElementById('settings-sound');
-const settingsSaved    = document.getElementById('settings-saved');
+const settingsSound = document.getElementById('settings-sound');
+const settingsPrepare = document.getElementById('settings-prepare');
+const settingsSaved = document.getElementById('settings-saved');
 
 function loadSettings() {
-  const dur   = localStorage.getItem('settings_duration');
+  const dur = localStorage.getItem('settings_duration');
   const sound = localStorage.getItem('settings_sound');
-  if (dur)   settingsDuration.value = dur;
-  if (sound) settingsSound.value    = sound;
+  const prep = localStorage.getItem('settings_prepare');
+  if (dur) { settingsDuration.value = dur; }
+  if (sound) { settingsSound.value = sound; }
+  if (prep !== null) {
+    prepareSeconds = parseInt(prep);
+    if (settingsPrepare) settingsPrepare.value = prepareSeconds;
+  } else {
+    if (settingsPrepare) settingsPrepare.value = prepareSeconds;
+  }
 }
 
 document.getElementById('btn-save-settings').addEventListener('click', () => {
-  const dur   = parseInt(settingsDuration.value);
+  const dur = parseInt(settingsDuration.value);
   const sound = settingsSound.value;
+  const prep = parseInt(settingsPrepare.value);
   if (dur > 0) {
     localStorage.setItem('settings_duration', dur);
     selectPreset(dur);
   }
   localStorage.setItem('settings_sound', sound);
   soundSelect.value = sound;
+  if (!isNaN(prep) && prep >= 0) {
+    prepareSeconds = prep;
+    localStorage.setItem('settings_prepare', prep);
+  }
   settingsSaved.style.display = 'inline';
-  setTimeout(() => settingsSaved.style.display = 'none', 2000);
+  setTimeout(() => { settingsSaved.style.display = 'none'; }, 2000);
 });
 
 // ─── Init ────────────────────────────────────────────────────────
