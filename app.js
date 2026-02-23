@@ -117,6 +117,33 @@ document.getElementById('btn-theme').addEventListener('click', () => {
 let bellAudio = null;
 let noSleep = null;
 
+// Shared persistent AudioContext — created once, reused for all chugpi sounds
+let sharedAudioCtx = null;
+
+function getAudioContext() {
+  if (!sharedAudioCtx) {
+    const AudioCtx = window.AudioContext || window.webkitAudioContext;
+    sharedAudioCtx = new AudioCtx();
+  }
+  return sharedAudioCtx;
+}
+
+// Unlock iOS audio on user gesture: resume shared ctx + silent bell play
+async function unlockAudio() {
+  // 1. Resume Web AudioContext (needed for chugpi / Web Audio API)
+  const ctx = getAudioContext();
+  if (ctx.state === 'suspended') {
+    await ctx.resume();
+  }
+
+  // 2. Play a silent clone of bellAudio to unlock HTMLAudioElement on iOS
+  if (bellAudio) {
+    const silent = bellAudio.cloneNode();
+    silent.volume = 0.001;
+    try { await silent.play(); } catch (_) {}
+  }
+}
+
 async function initAudio() {
   if (bellAudio) return;
   bellAudio = new Audio('bell.mp3');
@@ -138,51 +165,60 @@ function playBell(timeSeconds = 0) {
 
 function playChugpi(timeSeconds = 0) {
   setTimeout(() => {
-    const AudioCtx = window.AudioContext || window.webkitAudioContext;
-    const ctx = new AudioCtx();
-    const now = ctx.currentTime;
+    const ctx = getAudioContext();
 
-    // Layer 1: sharp crack
-    const crackSize = ctx.sampleRate * 0.08;
-    const crackBuf = ctx.createBuffer(1, crackSize, ctx.sampleRate);
-    const crackData = crackBuf.getChannelData(0);
-    for (let i = 0; i < crackSize; i++)
-      crackData[i] = (Math.random() * 2 - 1) * Math.pow(1 - i / crackSize, 4);
-    const crackSrc = ctx.createBufferSource();
-    crackSrc.buffer = crackBuf;
-    const crackFilter = ctx.createBiquadFilter();
-    crackFilter.type = 'bandpass';
-    crackFilter.frequency.value = 3500;
-    crackFilter.Q.value = 0.6;
-    const crackGain = ctx.createGain();
-    crackGain.gain.setValueAtTime(3.5, now);
-    crackGain.gain.exponentialRampToValueAtTime(0.001, now + 0.08);
-    crackSrc.connect(crackFilter);
-    crackFilter.connect(crackGain);
-    crackGain.connect(ctx.destination);
-    crackSrc.start(now);
-    crackSrc.stop(now + 0.08);
+    // Resume if suspended (iOS may suspend between interactions)
+    const doPlay = () => {
+      const now = ctx.currentTime;
 
-    // Layer 2: woody resonance
-    const resonanceSize = ctx.sampleRate * 0.3;
-    const resBuf = ctx.createBuffer(1, resonanceSize, ctx.sampleRate);
-    const resData = resBuf.getChannelData(0);
-    for (let i = 0; i < resonanceSize; i++)
-      resData[i] = (Math.random() * 2 - 1) * Math.pow(1 - i / resonanceSize, 12);
-    const resSrc = ctx.createBufferSource();
-    resSrc.buffer = resBuf;
-    const resFilter = ctx.createBiquadFilter();
-    resFilter.type = 'bandpass';
-    resFilter.frequency.value = 900;
-    resFilter.Q.value = 1.2;
-    const resGain = ctx.createGain();
-    resGain.gain.setValueAtTime(2.0, now);
-    resGain.gain.exponentialRampToValueAtTime(0.001, now + 0.3);
-    resSrc.connect(resFilter);
-    resFilter.connect(resGain);
-    resGain.connect(ctx.destination);
-    resSrc.start(now);
-    resSrc.stop(now + 0.3);
+      // Layer 1: sharp crack
+      const crackSize = ctx.sampleRate * 0.08;
+      const crackBuf = ctx.createBuffer(1, crackSize, ctx.sampleRate);
+      const crackData = crackBuf.getChannelData(0);
+      for (let i = 0; i < crackSize; i++)
+        crackData[i] = (Math.random() * 2 - 1) * Math.pow(1 - i / crackSize, 4);
+      const crackSrc = ctx.createBufferSource();
+      crackSrc.buffer = crackBuf;
+      const crackFilter = ctx.createBiquadFilter();
+      crackFilter.type = 'bandpass';
+      crackFilter.frequency.value = 3500;
+      crackFilter.Q.value = 0.6;
+      const crackGain = ctx.createGain();
+      crackGain.gain.setValueAtTime(3.5, now);
+      crackGain.gain.exponentialRampToValueAtTime(0.001, now + 0.08);
+      crackSrc.connect(crackFilter);
+      crackFilter.connect(crackGain);
+      crackGain.connect(ctx.destination);
+      crackSrc.start(now);
+      crackSrc.stop(now + 0.08);
+
+      // Layer 2: woody resonance
+      const resonanceSize = ctx.sampleRate * 0.3;
+      const resBuf = ctx.createBuffer(1, resonanceSize, ctx.sampleRate);
+      const resData = resBuf.getChannelData(0);
+      for (let i = 0; i < resonanceSize; i++)
+        resData[i] = (Math.random() * 2 - 1) * Math.pow(1 - i / resonanceSize, 12);
+      const resSrc = ctx.createBufferSource();
+      resSrc.buffer = resBuf;
+      const resFilter = ctx.createBiquadFilter();
+      resFilter.type = 'bandpass';
+      resFilter.frequency.value = 900;
+      resFilter.Q.value = 1.2;
+      const resGain = ctx.createGain();
+      resGain.gain.setValueAtTime(2.0, now);
+      resGain.gain.exponentialRampToValueAtTime(0.001, now + 0.3);
+      resSrc.connect(resFilter);
+      resFilter.connect(resGain);
+      resGain.connect(ctx.destination);
+      resSrc.start(now);
+      resSrc.stop(now + 0.3);
+    };
+
+    if (ctx.state === 'suspended') {
+      ctx.resume().then(doPlay).catch(e => console.error('AudioContext resume failed:', e));
+    } else {
+      doPlay();
+    }
   }, timeSeconds * 1000);
 }
 
@@ -216,7 +252,7 @@ let intervalBellMs = 0;
 let nextIntervalAt = null;
 let currentSound = 'bell';
 let selectedMinutes = 20;
-let prepareSeconds = 10; // default countdown
+let prepareSeconds = 10;
 
 // ─── DOM ─────────────────────────────────────────────────────────
 
@@ -272,6 +308,7 @@ btnStart.addEventListener('click', async () => {
   btnStart.disabled = true;
   btnStart.textContent = t('btn_loading');
   statusEl.textContent = t('status_loading');
+
   try {
     await initAudio();
   } catch (e) {
@@ -281,8 +318,14 @@ btnStart.addEventListener('click', async () => {
     btnStart.textContent = t('btn_start');
     return;
   }
+
+  // ← iOS fix: unlock both HTMLAudio and Web AudioContext
+  //   right here inside the click handler, before any setTimeout delay
+  await unlockAudio();
+
   if (!noSleep && window.NoSleep) noSleep = new NoSleep();
   if (noSleep) noSleep.enable();
+
   btnStart.textContent = t('btn_start');
   startCountdown();
 });
@@ -377,7 +420,7 @@ function stopSession() {
     statusEl.textContent = t('status_ready');
     btnStart.disabled = false;
     btnStop.disabled = true;
-    display.textContent = formatTime(plannedDuration || selectedMinutes * 60);
+    display.textContent = formatTime(selectedMinutes * 60);
     return;
   }
 
