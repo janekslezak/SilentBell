@@ -1,4 +1,4 @@
-const CACHE = 'chimukuijong-v3';
+const CACHE = 'chimukuijong-v4';
 const ASSETS = [
   '/',
   '/index.html',
@@ -6,24 +6,20 @@ const ASSETS = [
   '/app.js',
   '/manifest.json',
   '/bell.mp3',
-  '/icon-192.png',
-  '/icon-512.png',
+  '/icon-192.jpg',
+  '/icon-512.jpg',
   '/NoSleep.min.js'
 ];
 
 self.addEventListener('install', e => {
-  e.waitUntil(
-    caches.open(CACHE).then(cache => cache.addAll(ASSETS))
-  );
+  e.waitUntil(caches.open(CACHE).then(c => c.addAll(ASSETS)));
   self.skipWaiting();
 });
 
 self.addEventListener('activate', e => {
   e.waitUntil(
     caches.keys().then(keys =>
-      Promise.all(
-        keys.filter(key => key !== CACHE).map(key => caches.delete(key))
-      )
+      Promise.all(keys.filter(k => k !== CACHE).map(k => caches.delete(k)))
     )
   );
   self.clients.claim();
@@ -33,20 +29,15 @@ self.addEventListener('fetch', e => {
   e.respondWith(
     caches.match(e.request).then(cached => {
       if (cached) return cached;
-      return fetch(e.request).then(response => {
-        if (
-          e.request.method === 'GET' &&
-          response.status === 200 &&
-          response.type !== 'opaque'
-        ) {
-          const copy = response.clone();
-          caches.open(CACHE).then(cache => cache.put(e.request, copy));
+      return fetch(e.request).then(res => {
+        if (e.request.method === 'GET' && res.status === 200 && res.type !== 'opaque') {
+          const copy = res.clone();
+          caches.open(CACHE).then(c => c.put(e.request, copy));
         }
-        return response;
+        return res;
       });
     }).catch(() => {
-      if (e.request.mode === 'navigate')
-        return caches.match('/index.html');
+      if (e.request.mode === 'navigate') return caches.match('/index.html');
     })
   );
 });

@@ -1,59 +1,69 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <meta name="theme-color" content="#111820" />
-  <meta name="apple-mobile-web-app-capable" content="yes" />
-  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
-  <meta name="apple-mobile-web-app-title" content="Silent Bell 침묵의 종" />
-  <title>Silent Bell 침묵의 종</title>
-  <link rel="manifest" href="manifest.json" />
-  <link rel="stylesheet" href="style.css" />
-  <link rel="apple-touch-icon" href="icon-192.png" />
-  <script>
-    if ('serviceWorker' in navigator)
-      navigator.serviceWorker.register('/sw.js');
-  </script>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <meta name="theme-color" content="#111820"/>
+  <meta name="mobile-web-app-capable" content="yes"/>
+  <meta name="apple-mobile-web-app-capable" content="yes"/>
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent"/>
+  <title>Silent Bell</title>
+  <link rel="manifest" href="manifest.json"/>
+  <link rel="apple-touch-icon" href="icon-192.png"/>
+  <link rel="stylesheet" href="style.css"/>
 </head>
 <body>
+
+  <header>
+    <div class="header-left">
+      <img src="icon-192.png" alt="" class="header-icon"/>
+      <span class="header-title" data-i18n="app_title">Silent Bell</span>
+    </div>
+    <div class="header-controls">
+      <button id="btn-lang">PL</button>
+      <button id="btn-theme">☀️</button>
+    </div>
+  </header>
+
   <nav>
-    <button class="nav-btn active" data-view="timer">Timer</button>
-    <button class="nav-btn" data-view="log">Log</button>
-    <button class="nav-btn" data-view="settings">Settings</button>
+    <button class="nav-btn active" data-view="timer" data-i18n="nav_timer">Timer</button>
+    <button class="nav-btn" data-view="log" data-i18n="nav_log">Log</button>
+    <button class="nav-btn" data-view="settings" data-i18n="nav_settings">Settings</button>
   </nav>
 
-  <!-- TIMER VIEW -->
-  <section id="view-timer" class="view active">
-    <div id="display">00:00</div>
-    <div id="status">Ready</div>
+  <!-- ── Timer view ── -->
+  <div id="view-timer" class="view active">
+
+    <div id="display">20:00</div>
+    <div id="status" data-i18n="status_ready">Ready</div>
 
     <div class="duration-presets">
-      <button class="preset" data-min="5">5m</button>
-      <button class="preset" data-min="10">10m</button>
-      <button class="preset" data-min="20">20m</button>
-      <button class="preset" data-min="30">30m</button>
-      <button class="preset" data-min="45">45m</button>
-      <button class="preset" data-min="60">60m</button>
+      <button class="preset" data-min="5">5 min</button>
+      <button class="preset" data-min="10">10 min</button>
+      <button class="preset selected" data-min="20">20 min</button>
+      <button class="preset" data-min="30">30 min</button>
+      <button class="preset" data-min="45">45 min</button>
+      <button class="preset" data-min="60">60 min</button>
     </div>
 
     <div class="custom-row">
-      <input type="number" id="custom-min" placeholder="Custom min" min="1" max="180" />
+      <input type="number" id="custom-min" min="1" max="480"
+             data-i18n-placeholder="custom_placeholder" placeholder="Custom min"/>
     </div>
 
     <div class="field-group">
-      <span class="field-label">Sound</span>
+      <label class="field-label" data-i18n="label_sound">Sound</label>
       <select id="sound-select">
-        <option value="bowl">Bell</option>
-        <option value="chugpi">Chugpi (죽비)</option>
-        <option value="none">Silent</option>
+        <option value="bell"   data-i18n="sound_bell">Bell</option>
+        <option value="chugpi" data-i18n="sound_chugpi">Korean 죽비 (Chugpi)</option>
+        <option value="none"   data-i18n="sound_silent">Silent</option>
       </select>
     </div>
 
     <div class="field-group">
-      <span class="field-label">Interval bells every</span>
+      <label class="field-label" data-i18n="label_interval">Interval bells every</label>
       <select id="interval-select">
-        <option value="0">None</option>
+        <option value="0"  data-i18n="interval_none">None</option>
         <option value="5">5 min</option>
         <option value="10">10 min</option>
         <option value="15">15 min</option>
@@ -61,39 +71,63 @@
       </select>
     </div>
 
-    <div class="controls">
-      <button id="btn-start">Start</button>
-      <button id="btn-stop" disabled>Stop</button>
+    <!-- Lotus: shown only while meditating via CSS -->
+    <div class="lotus-figure">
+      <svg viewBox="0 0 100 80" xmlns="http://www.w3.org/2000/svg" class="lotus-svg">
+        <path d="M 50,60 C 44,45 44,28 50,18 C 56,28 56,45 50,60 Z"
+              fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/>
+        <path d="M 50,60 C 38,50 32,34 36,22 C 44,30 48,46 50,60 Z"
+              fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/>
+        <path d="M 50,60 C 62,50 68,34 64,22 C 56,30 52,46 50,60 Z"
+              fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/>
+        <path d="M 50,60 C 34,54 22,40 24,26 C 34,32 44,48 50,60 Z"
+              fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/>
+        <path d="M 50,60 C 66,54 78,40 76,26 C 66,32 56,48 50,60 Z"
+              fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/>
+        <path d="M 50,60 C 30,58 14,46 14,32 C 26,36 40,52 50,60 Z"
+              fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/>
+        <path d="M 50,60 C 70,58 86,46 86,32 C 74,36 60,52 50,60 Z"
+              fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/>
+        <path d="M 20,63 Q 50,70 80,63"
+              fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+      </svg>
     </div>
-  </section>
 
-  <!-- LOG VIEW -->
-  <section id="view-log" class="view">
-    <h2>Session Log</h2>
+    <!-- Both buttons always in DOM, CSS controls visibility -->
+    <div class="controls">
+      <button id="btn-start" data-i18n="btn_start">Start</button>
+      <button id="btn-stop"  data-i18n="btn_stop" disabled>Stop</button>
+    </div>
+
+  </div>
+
+  <!-- ── Log view ── -->
+  <div id="view-log" class="view">
+    <h2 data-i18n="nav_log">Log</h2>
     <div id="log-summary"></div>
     <ul id="log-list"></ul>
-    <button id="btn-export">Export CSV</button>
-    <button id="btn-clear-log">Clear Log</button>
-  </section>
+    <button id="btn-export" data-i18n="btn_export">Export CSV</button>
+    <button id="btn-clear-log" data-i18n="btn_clear">Clear Log</button>
+  </div>
 
-  <!-- SETTINGS VIEW -->
-  <section id="view-settings" class="view">
-    <h2>Settings</h2>
+  <!-- ── Settings view ── -->
+  <div id="view-settings" class="view">
+    <h2 data-i18n="nav_settings">Settings</h2>
     <div class="field-group">
-      <span class="field-label">Default duration (min)</span>
-      <input type="number" id="default-duration" min="1" max="180" value="20" />
+      <label class="field-label" data-i18n="settings_duration">Default duration (min)</label>
+      <input type="number" id="settings-duration" min="1" max="480"/>
     </div>
     <div class="field-group">
-      <span class="field-label">Default sound</span>
-      <select id="default-sound">
-        <option value="bowl">Bell</option>
-        <option value="chugpi">Chugpi (죽비)</option>
-        <option value="none">Silent</option>
+      <label class="field-label" data-i18n="settings_sound">Default sound</label>
+      <select id="settings-sound">
+        <option value="bell"   data-i18n="sound_bell">Bell</option>
+        <option value="chugpi" data-i18n="sound_chugpi">Korean 죽비 (Chugpi)</option>
+        <option value="none"   data-i18n="sound_silent">Silent</option>
       </select>
     </div>
-    <button id="btn-save-settings">Save</button>
-    <p id="settings-saved" style="display:none;color:#88c0d0">Saved ✓</p>
-  </section>
+    <button id="btn-save-settings" data-i18n="btn_save">Save</button>
+    <span id="settings-saved" style="display:none" data-i18n="settings_saved">Saved ✓</span>
+  </div>
 
   <script src="NoSleep.min.js"></script>
   <script src="app.js"></script>
