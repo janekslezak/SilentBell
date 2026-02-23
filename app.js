@@ -48,7 +48,7 @@ const STRINGS = {
     label_interval:    'Dzwon co',
     sound_bell:        'Dzwon',
     sound_chugpi:      'Jugbi 죽비',
-    sound_silent:      'Cicho',
+    sound_silent:      'Cisza',
     interval_none:     'Brak',
     btn_start:         'Start',
     btn_stop:          'Stop',
