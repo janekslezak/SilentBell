@@ -668,3 +668,4 @@ applyLang();
 applyTheme();
 loadSettings();
 
+
