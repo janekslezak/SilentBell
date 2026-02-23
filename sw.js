@@ -1,14 +1,13 @@
-const CACHE = 'chimukuijong-v4';
+const CACHE = 'chimukuijong-v5';
 const ASSETS = [
   '/',
-  '/index.html',
-  '/style.css',
-  '/app.js',
-  '/manifest.json',
-  '/bell.mp3',
-  '/icon-192.jpg',
-  '/icon-512.jpg',
-  '/NoSleep.min.js'
+  'index.html',
+  'style.css',
+  'app.js',
+  'manifest.json',
+  'icon-192.jpg',
+  'icon-512.jpg',
+  'NoSleep.min.js'
 ];
 
 self.addEventListener('install', e => {
@@ -35,9 +34,9 @@ self.addEventListener('fetch', e => {
           caches.open(CACHE).then(c => c.put(e.request, copy));
         }
         return res;
+      }).catch(() => {
+        if (e.request.mode === 'navigate') return caches.match('index.html');
       });
-    }).catch(() => {
-      if (e.request.mode === 'navigate') return caches.match('/index.html');
     })
   );
 });

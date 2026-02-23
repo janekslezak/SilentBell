@@ -7,7 +7,6 @@ const STRINGS = {
     nav_log: 'Log',
     nav_settings: 'Settings',
     status_ready: 'Ready',
-    status_loading: 'Loading sound…',
     status_meditating: 'Meditating…',
     status_complete: 'Session complete 🙏',
     status_stopped: 'Stopped early',
@@ -20,7 +19,6 @@ const STRINGS = {
     interval_none: 'None',
     btn_start: 'Start',
     btn_stop: 'Stop',
-    btn_loading: 'Loading…',
     btn_export: 'Export CSV',
     btn_clear: 'Clear Log',
     btn_save: 'Save',
@@ -42,7 +40,6 @@ const STRINGS = {
     nav_log: 'Dziennik',
     nav_settings: 'Ustawienia',
     status_ready: 'Gotowy',
-    status_loading: 'Ładowanie dźwięku…',
     status_meditating: 'Medytacja…',
     status_complete: 'Sesja zakończona 🙏',
     status_stopped: 'Przerwano',
@@ -55,7 +52,6 @@ const STRINGS = {
     interval_none: 'Brak',
     btn_start: 'Start',
     btn_stop: 'Stop',
-    btn_loading: 'Ładowanie…',
     btn_export: 'Eksport CSV',
     btn_clear: 'Wyczyść',
     btn_save: 'Zapisz',
@@ -73,40 +69,42 @@ const STRINGS = {
   }
 };
 
-let currentLang = localStorage.getItem('lang') || 'en';
-let currentTheme = localStorage.getItem('theme') || 'dark';
+var currentLang = localStorage.getItem('lang') || 'en';
+var currentTheme = localStorage.getItem('theme') || 'dark';
 
 function t(key) {
-  return STRINGS[currentLang][key] || STRINGS['en'][key] || key;
+  return (STRINGS[currentLang] && STRINGS[currentLang][key])
+    || (STRINGS['en'] && STRINGS['en'][key])
+    || key;
 }
 
 function applyLang() {
   document.documentElement.lang = currentLang;
-  document.querySelectorAll('[data-i18n]').forEach(el => {
+  document.querySelectorAll('[data-i18n]').forEach(function(el) {
     el.textContent = t(el.dataset.i18n);
   });
-  document.querySelectorAll('[data-i18n-placeholder]').forEach(el => {
+  document.querySelectorAll('[data-i18n-placeholder]').forEach(function(el) {
     el.placeholder = t(el.dataset.i18nPlaceholder);
   });
   document.getElementById('btn-lang').textContent = currentLang === 'en' ? 'PL' : 'EN';
-  const logView = document.getElementById('view-log');
-  if (logView.classList.contains('active')) renderLog();
+  var logView = document.getElementById('view-log');
+  if (logView && logView.classList.contains('active')) renderLog();
 }
 
 function applyTheme() {
   document.documentElement.setAttribute('data-theme', currentTheme);
   document.getElementById('btn-theme').textContent = currentTheme === 'dark' ? '☀️' : '🌙';
-  document.querySelector('meta[name="theme-color"]').content =
-    currentTheme === 'dark' ? '#111820' : '#f0ece4';
+  var meta = document.querySelector('meta[name="theme-color"]');
+  if (meta) meta.content = currentTheme === 'dark' ? '#111820' : '#f0ece4';
 }
 
-document.getElementById('btn-lang').addEventListener('click', () => {
+document.getElementById('btn-lang').addEventListener('click', function() {
   currentLang = currentLang === 'en' ? 'pl' : 'en';
   localStorage.setItem('lang', currentLang);
   applyLang();
 });
 
-document.getElementById('btn-theme').addEventListener('click', () => {
+document.getElementById('btn-theme').addEventListener('click', function() {
   currentTheme = currentTheme === 'dark' ? 'light' : 'dark';
   localStorage.setItem('theme', currentTheme);
   applyTheme();
@@ -114,125 +112,243 @@ document.getElementById('btn-theme').addEventListener('click', () => {
 
 // ─── Audio Engine ────────────────────────────────────────────────
 
-let bellAudio = null;
-let noSleep = null;
-
-// Shared persistent AudioContext — created once, reused for all chugpi sounds
-let sharedAudioCtx = null;
+var noSleep = null;
+var sharedAudioCtx = null;
+var silentLoop = null;
 
 function getAudioContext() {
   if (!sharedAudioCtx) {
-    const AudioCtx = window.AudioContext || window.webkitAudioContext;
+    var AudioCtx = window.AudioContext || window.webkitAudioContext;
     sharedAudioCtx = new AudioCtx();
   }
   return sharedAudioCtx;
 }
 
-// Unlock iOS audio on user gesture: resume shared ctx + silent bell play
-async function unlockAudio() {
-  // 1. Resume Web AudioContext (needed for chugpi / Web Audio API)
-  const ctx = getAudioContext();
-  if (ctx.state === 'suspended') {
-    await ctx.resume();
+// ─── Silent-switch bypass for iOS ────────────────────────────────
+// A looping silent HTMLAudioElement forces iOS to route ALL audio
+// through the media category, which ignores the silent switch.
+
+function createSilentLoop() {
+  if (silentLoop) return;
+  // Minimal valid silent MP3 as base64 data URI — no extra file needed
+  var SILENT_MP3 = 'data:audio/mpeg;base64,SUQzBAAAAAAA' +
+    'IVRSQ0sAAAAZAAAAA0xlbmd0aAAAAAAAAAAAAAAAAAAAAAAAAAD/+0DEAAAB' +
+    'aABgAAAAAA0gAAAAAAxhTEFNRTMuMTAwVVVVVVVVVVVVVVVVVVVVVVVVVVVV' +
+    'VVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVV' +
+    'VVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVV' +
+    'VVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVV' +
+    'VVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVV' +
+    'VVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVV' +
+    'VVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVV' +
+    'VVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVV' +
+    'VVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVV' +
+    'VVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVV' +
+    'VVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVV';
+  silentLoop = new Audio(SILENT_MP3);
+  silentLoop.loop = true;
+  silentLoop.volume = 0.001;
+  silentLoop.setAttribute('playsinline', '');
+  silentLoop.setAttribute('x-webkit-airplay', 'deny');
+}
+
+function startSilentLoop() {
+  createSilentLoop();
+  silentLoop.play().catch(function(e) { console.warn('Silent loop failed:', e); });
+}
+
+function stopSilentLoop() {
+  if (silentLoop) {
+    silentLoop.pause();
+    silentLoop.currentTime = 0;
   }
-
-  // 2. Play a silent clone of bellAudio to unlock HTMLAudioElement on iOS
-  if (bellAudio) {
-    const silent = bellAudio.cloneNode();
-    silent.volume = 0.001;
-    try { await silent.play(); } catch (_) {}
-  }
 }
 
-async function initAudio() {
-  if (bellAudio) return;
-  bellAudio = new Audio('bell.mp3');
-  bellAudio.preload = 'auto';
-  await new Promise((resolve, reject) => {
-    bellAudio.addEventListener('canplaythrough', resolve, { once: true });
-    bellAudio.addEventListener('error', reject, { once: true });
-    bellAudio.load();
-  });
-}
-
-function playBell(timeSeconds = 0) {
-  if (!bellAudio) return;
-  setTimeout(() => {
-    const clip = bellAudio.cloneNode();
-    clip.play().catch(e => console.error('Bell play failed:', e));
-  }, timeSeconds * 1000);
-}
-
-function playChugpi(timeSeconds = 0) {
-  setTimeout(() => {
-    const ctx = getAudioContext();
-
-    // Resume if suspended (iOS may suspend between interactions)
-    const doPlay = () => {
-      const now = ctx.currentTime;
-
-      // Layer 1: sharp crack
-      const crackSize = ctx.sampleRate * 0.08;
-      const crackBuf = ctx.createBuffer(1, crackSize, ctx.sampleRate);
-      const crackData = crackBuf.getChannelData(0);
-      for (let i = 0; i < crackSize; i++)
-        crackData[i] = (Math.random() * 2 - 1) * Math.pow(1 - i / crackSize, 4);
-      const crackSrc = ctx.createBufferSource();
-      crackSrc.buffer = crackBuf;
-      const crackFilter = ctx.createBiquadFilter();
-      crackFilter.type = 'bandpass';
-      crackFilter.frequency.value = 3500;
-      crackFilter.Q.value = 0.6;
-      const crackGain = ctx.createGain();
-      crackGain.gain.setValueAtTime(3.5, now);
-      crackGain.gain.exponentialRampToValueAtTime(0.001, now + 0.08);
-      crackSrc.connect(crackFilter);
-      crackFilter.connect(crackGain);
-      crackGain.connect(ctx.destination);
-      crackSrc.start(now);
-      crackSrc.stop(now + 0.08);
-
-      // Layer 2: woody resonance
-      const resonanceSize = ctx.sampleRate * 0.3;
-      const resBuf = ctx.createBuffer(1, resonanceSize, ctx.sampleRate);
-      const resData = resBuf.getChannelData(0);
-      for (let i = 0; i < resonanceSize; i++)
-        resData[i] = (Math.random() * 2 - 1) * Math.pow(1 - i / resonanceSize, 12);
-      const resSrc = ctx.createBufferSource();
-      resSrc.buffer = resBuf;
-      const resFilter = ctx.createBiquadFilter();
-      resFilter.type = 'bandpass';
-      resFilter.frequency.value = 900;
-      resFilter.Q.value = 1.2;
-      const resGain = ctx.createGain();
-      resGain.gain.setValueAtTime(2.0, now);
-      resGain.gain.exponentialRampToValueAtTime(0.001, now + 0.3);
-      resSrc.connect(resFilter);
-      resFilter.connect(resGain);
-      resGain.connect(ctx.destination);
-      resSrc.start(now);
-      resSrc.stop(now + 0.3);
-    };
-
+function unlockAudio() {
+  try {
+    var ctx = getAudioContext();
     if (ctx.state === 'suspended') {
-      ctx.resume().then(doPlay).catch(e => console.error('AudioContext resume failed:', e));
-    } else {
-      doPlay();
+      ctx.resume();
     }
-  }, timeSeconds * 1000);
+    // Silent zero-filled buffer — activates AudioContext on iOS
+    var silentBuf = ctx.createBuffer(1, 512, ctx.sampleRate);
+    var silentSrc = ctx.createBufferSource();
+    silentSrc.buffer = silentBuf;
+    silentSrc.connect(ctx.destination);
+    silentSrc.start(0);
+    // Start silent loop to switch iOS into media audio category
+    startSilentLoop();
+  } catch (e) {
+    console.warn('unlockAudio failed:', e);
+  }
 }
 
-function playSound(type, timeSeconds = 0) {
+// ─── Temple Bell Synthesizer ──────────────────────────────────────
+
+function playTempleBell(startTime, velocity) {
+  velocity = velocity !== undefined ? velocity : 1.0;
+  var ctx = getAudioContext();
+  var t0 = startTime;
+
+  var master = ctx.createDynamicsCompressor();
+  master.threshold.value = -6;
+  master.knee.value = 6;
+  master.ratio.value = 3;
+  master.attack.value = 0.003;
+  master.release.value = 0.25;
+  master.connect(ctx.destination);
+
+  // Strike transient
+  var clankSize = Math.floor(ctx.sampleRate * 0.04);
+  var clankBuf = ctx.createBuffer(1, clankSize, ctx.sampleRate);
+  var clankData = clankBuf.getChannelData(0);
+  for (var i = 0; i < clankSize; i++)
+    clankData[i] = (Math.random() * 2 - 1) * Math.pow(1 - i / clankSize, 2);
+  var clankSrc = ctx.createBufferSource();
+  clankSrc.buffer = clankBuf;
+  var clankBp = ctx.createBiquadFilter();
+  clankBp.type = 'bandpass';
+  clankBp.frequency.value = 6000;
+  clankBp.Q.value = 0.8;
+  var clankGain = ctx.createGain();
+  clankGain.gain.setValueAtTime(0.001, t0);
+  clankGain.gain.linearRampToValueAtTime(1.2 * velocity, t0 + 0.002);
+  clankGain.gain.exponentialRampToValueAtTime(0.001, t0 + 0.06);
+  clankSrc.connect(clankBp);
+  clankBp.connect(clankGain);
+  clankGain.connect(master);
+  clankSrc.start(t0);
+  clankSrc.stop(t0 + 0.07);
+
+  // Sinusoidal partial helper
+  function addPartial(freq, gainPeak, attackTime, decayTime) {
+    var osc = ctx.createOscillator();
+    osc.type = 'sine';
+    osc.frequency.value = freq;
+    var env = ctx.createGain();
+    env.gain.setValueAtTime(0.001, t0);
+    env.gain.linearRampToValueAtTime(gainPeak * velocity, t0 + attackTime);
+    env.gain.exponentialRampToValueAtTime(0.0001, t0 + decayTime);
+    osc.connect(env);
+    env.connect(master);
+    osc.start(t0);
+    osc.stop(t0 + decayTime + 0.1);
+  }
+
+  // Fundamental + inharmonic partials (real bell acoustic ratios)
+  addPartial(110,  0.55, 0.012, 14.0);
+  addPartial(304,  0.40, 0.008,  9.0);
+  addPartial(594,  0.28, 0.006,  6.5);
+  addPartial(982,  0.18, 0.004,  4.0);
+  addPartial(1627, 0.10, 0.003,  2.5);
+
+  // Shimmer tremolo — gentle LFO on fundamental for living sustain
+  var shimmerLfo = ctx.createOscillator();
+  shimmerLfo.type = 'sine';
+  shimmerLfo.frequency.value = 4.5;
+  var shimmerDepth = ctx.createGain();
+  shimmerDepth.gain.value = 0.06;
+  var shimmerFund = ctx.createOscillator();
+  shimmerFund.type = 'sine';
+  shimmerFund.frequency.value = 110;
+  var shimmerEnv = ctx.createGain();
+  shimmerEnv.gain.setValueAtTime(0.001, t0);
+  shimmerEnv.gain.linearRampToValueAtTime(0.15 * velocity, t0 + 0.05);
+  shimmerEnv.gain.exponentialRampToValueAtTime(0.0001, t0 + 14.0);
+  shimmerLfo.connect(shimmerDepth);
+  shimmerDepth.connect(shimmerEnv.gain);
+  shimmerFund.connect(shimmerEnv);
+  shimmerEnv.connect(master);
+  shimmerLfo.start(t0);
+  shimmerFund.start(t0);
+  shimmerLfo.stop(t0 + 14.1);
+  shimmerFund.stop(t0 + 14.1);
+}
+
+// ─── Chugpi (죽비) Synthesizer ────────────────────────────────────
+
+function playChugpiNow(startTime) {
+  var ctx = getAudioContext();
+  var now = startTime;
+
+  var crackSize = Math.floor(ctx.sampleRate * 0.08);
+  var crackBuf = ctx.createBuffer(1, crackSize, ctx.sampleRate);
+  var crackData = crackBuf.getChannelData(0);
+  for (var i = 0; i < crackSize; i++)
+    crackData[i] = (Math.random() * 2 - 1) * Math.pow(1 - i / crackSize, 4);
+  var crackSrc = ctx.createBufferSource();
+  crackSrc.buffer = crackBuf;
+  var crackFilter = ctx.createBiquadFilter();
+  crackFilter.type = 'bandpass';
+  crackFilter.frequency.value = 3500;
+  crackFilter.Q.value = 0.6;
+  var crackGain = ctx.createGain();
+  crackGain.gain.setValueAtTime(3.5, now);
+  crackGain.gain.exponentialRampToValueAtTime(0.001, now + 0.08);
+  crackSrc.connect(crackFilter);
+  crackFilter.connect(crackGain);
+  crackGain.connect(ctx.destination);
+  crackSrc.start(now);
+  crackSrc.stop(now + 0.09);
+
+  var resSize = Math.floor(ctx.sampleRate * 0.3);
+  var resBuf = ctx.createBuffer(1, resSize, ctx.sampleRate);
+  var resData = resBuf.getChannelData(0);
+  for (var j = 0; j < resSize; j++)
+    resData[j] = (Math.random() * 2 - 1) * Math.pow(1 - j / resSize, 12);
+  var resSrc = ctx.createBufferSource();
+  resSrc.buffer = resBuf;
+  var resFilter = ctx.createBiquadFilter();
+  resFilter.type = 'bandpass';
+  resFilter.frequency.value = 900;
+  resFilter.Q.value = 1.2;
+  var resGain = ctx.createGain();
+  resGain.gain.setValueAtTime(2.0, now);
+  resGain.gain.exponentialRampToValueAtTime(0.001, now + 0.3);
+  resSrc.connect(resFilter);
+  resFilter.connect(resGain);
+  resGain.connect(ctx.destination);
+  resSrc.start(now);
+  resSrc.stop(now + 0.31);
+}
+
+// ─── Unified play functions ───────────────────────────────────────
+
+function playBell(timeSeconds) {
+  timeSeconds = timeSeconds || 0;
+  var ctx = getAudioContext();
+  function doPlay() { playTempleBell(ctx.currentTime + timeSeconds); }
+  if (ctx.state === 'suspended') {
+    ctx.resume().then(doPlay);
+  } else {
+    doPlay();
+  }
+}
+
+function playChugpi(timeSeconds) {
+  timeSeconds = timeSeconds || 0;
+  var ctx = getAudioContext();
+  function doPlay() { playChugpiNow(ctx.currentTime + timeSeconds); }
+  if (ctx.state === 'suspended') {
+    ctx.resume().then(doPlay);
+  } else {
+    doPlay();
+  }
+}
+
+function playSound(type, timeSeconds) {
+  timeSeconds = timeSeconds || 0;
   if (type === 'none') return;
   if (type === 'chugpi') playChugpi(timeSeconds);
   else playBell(timeSeconds);
 }
 
-function playStrokes(type, count, startDelay = 0) {
+function playStrokes(type, count, startDelay) {
+  startDelay = startDelay || 0;
   if (type === 'none') return;
-  const interval = type === 'chugpi' ? 1.5 : 1.4;
-  for (let i = 0; i < count; i++)
+  var interval = type === 'chugpi' ? 1.5 : 1.4;
+  for (var i = 0; i < count; i++) {
     playSound(type, startDelay + i * interval);
+  }
 }
 
 // ─── Meditation UI state ──────────────────────────────────────────
@@ -243,34 +359,34 @@ function setMeditating(active) {
 
 // ─── State ───────────────────────────────────────────────────────
 
-let timerInterval = null;
-let countdownInterval = null;
-let sessionStart = null;
-let endTimestamp = null;
-let plannedDuration = 0;
-let intervalBellMs = 0;
-let nextIntervalAt = null;
-let currentSound = 'bell';
-let selectedMinutes = 20;
-let prepareSeconds = 10;
+var timerInterval = null;
+var countdownInterval = null;
+var sessionStart = null;
+var endTimestamp = null;
+var plannedDuration = 0;
+var intervalBellMs = 0;
+var nextIntervalAt = null;
+var currentSound = 'bell';
+var selectedMinutes = 20;
+var prepareSeconds = 10;
 
-// ─── DOM ─────────────────────────────────────────────────────────
+// ─── DOM refs ────────────────────────────────────────────────────
 
-const display = document.getElementById('display');
-const statusEl = document.getElementById('status');
-const btnStart = document.getElementById('btn-start');
-const btnStop = document.getElementById('btn-stop');
-const soundSelect = document.getElementById('sound-select');
-const intervalSelect = document.getElementById('interval-select');
-const customMin = document.getElementById('custom-min');
-const presets = document.querySelectorAll('.preset');
+var display        = document.getElementById('display');
+var statusEl       = document.getElementById('status');
+var btnStart       = document.getElementById('btn-start');
+var btnStop        = document.getElementById('btn-stop');
+var soundSelect    = document.getElementById('sound-select');
+var intervalSelect = document.getElementById('interval-select');
+var customMin      = document.getElementById('custom-min');
+var presets        = document.querySelectorAll('.preset');
 
 // ─── Navigation ──────────────────────────────────────────────────
 
-document.querySelectorAll('.nav-btn').forEach(btn => {
-  btn.addEventListener('click', () => {
-    document.querySelectorAll('.nav-btn').forEach(b => b.classList.remove('active'));
-    document.querySelectorAll('.view').forEach(v => v.classList.remove('active'));
+document.querySelectorAll('.nav-btn').forEach(function(btn) {
+  btn.addEventListener('click', function() {
+    document.querySelectorAll('.nav-btn').forEach(function(b) { b.classList.remove('active'); });
+    document.querySelectorAll('.view').forEach(function(v) { v.classList.remove('active'); });
     btn.classList.add('active');
     document.getElementById('view-' + btn.dataset.view).classList.add('active');
     if (btn.dataset.view === 'log') renderLog();
@@ -281,17 +397,22 @@ document.querySelectorAll('.nav-btn').forEach(btn => {
 
 function selectPreset(min) {
   selectedMinutes = min;
-  presets.forEach(p => p.classList.toggle('selected', +p.dataset.min === min));
+  presets.forEach(function(p) {
+    p.classList.toggle('selected', +p.dataset.min === min);
+  });
   customMin.value = '';
   display.textContent = formatTime(min * 60);
 }
 
-presets.forEach(p => p.addEventListener('click', () => selectPreset(+p.dataset.min)));
-customMin.addEventListener('input', () => {
-  const v = parseInt(customMin.value);
+presets.forEach(function(p) {
+  p.addEventListener('click', function() { selectPreset(+p.dataset.min); });
+});
+
+customMin.addEventListener('input', function() {
+  var v = parseInt(customMin.value);
   if (v > 0) {
     selectedMinutes = v;
-    presets.forEach(p => p.classList.remove('selected'));
+    presets.forEach(function(p) { p.classList.remove('selected'); });
     display.textContent = formatTime(v * 60);
   }
 });
@@ -299,34 +420,24 @@ customMin.addEventListener('input', () => {
 // ─── Timer ───────────────────────────────────────────────────────
 
 function formatTime(secs) {
-  const m = String(Math.floor(Math.abs(secs) / 60)).padStart(2, '0');
-  const s = String(Math.abs(secs) % 60).padStart(2, '0');
-  return `${m}:${s}`;
+  var m = String(Math.floor(Math.abs(secs) / 60)).padStart(2, '0');
+  var s = String(Math.abs(secs) % 60).padStart(2, '0');
+  return m + ':' + s;
 }
 
-btnStart.addEventListener('click', async () => {
+// ─── Start / Stop buttons ────────────────────────────────────────
+
+btnStart.addEventListener('click', function() {
+  // Must be synchronous inside click — unlocks AudioContext and
+  // starts silent loop to bypass iOS silent switch
+  unlockAudio();
+
   btnStart.disabled = true;
-  btnStart.textContent = t('btn_loading');
-  statusEl.textContent = t('status_loading');
-
-  try {
-    await initAudio();
-  } catch (e) {
-    console.error('Failed to load bell.mp3:', e);
-    statusEl.textContent = 'Failed to load bell.mp3';
-    btnStart.disabled = false;
-    btnStart.textContent = t('btn_start');
-    return;
-  }
-
-  // ← iOS fix: unlock both HTMLAudio and Web AudioContext
-  //   right here inside the click handler, before any setTimeout delay
-  await unlockAudio();
+  statusEl.textContent = t('status_ready');
 
   if (!noSleep && window.NoSleep) noSleep = new NoSleep();
   if (noSleep) noSleep.enable();
 
-  btnStart.textContent = t('btn_start');
   startCountdown();
 });
 
@@ -336,7 +447,7 @@ btnStop.addEventListener('click', stopSession);
 
 function startCountdown() {
   currentSound = soundSelect.value;
-  let secsLeft = prepareSeconds;
+  var secsLeft = prepareSeconds;
 
   if (secsLeft <= 0) {
     startSession();
@@ -353,7 +464,7 @@ function startCountdown() {
 
   updateDisplay();
 
-  countdownInterval = setInterval(() => {
+  countdownInterval = setInterval(function() {
     secsLeft--;
     if (secsLeft <= 0) {
       clearInterval(countdownInterval);
@@ -386,8 +497,8 @@ function startSession() {
 }
 
 function tick() {
-  const now = Date.now();
-  const remaining = Math.max(0, Math.round((endTimestamp - now) / 1000));
+  var now = Date.now();
+  var remaining = Math.max(0, Math.round((endTimestamp - now) / 1000));
   display.textContent = formatTime(remaining);
 
   if (intervalBellMs > 0 && nextIntervalAt && now >= nextIntervalAt) {
@@ -401,6 +512,7 @@ function tick() {
     timerInterval = null;
     setMeditating(false);
     if (noSleep) noSleep.disable();
+    stopSilentLoop();
     playStrokes(currentSound, 3);
     saveSession(true);
     statusEl.textContent = t('status_complete');
@@ -417,6 +529,7 @@ function stopSession() {
     clearInterval(countdownInterval);
     countdownInterval = null;
     if (noSleep) noSleep.disable();
+    stopSilentLoop();
     statusEl.textContent = t('status_ready');
     btnStart.disabled = false;
     btnStop.disabled = true;
@@ -429,7 +542,8 @@ function stopSession() {
   timerInterval = null;
   setMeditating(false);
   if (noSleep) noSleep.disable();
-  const actual = Math.round((Date.now() - sessionStart) / 1000);
+  stopSilentLoop();
+  var actual = Math.round((Date.now() - sessionStart) / 1000);
   saveSession(false, actual);
   statusEl.textContent = t('status_stopped');
   btnStart.disabled = false;
@@ -440,18 +554,15 @@ function stopSession() {
 
 // ─── Log ─────────────────────────────────────────────────────────
 
-function saveSession(completed, actualSecs = null) {
-  const sessions = getSessions();
+function saveSession(completed, actualSecs) {
+  var sessions = getSessions();
   sessions.unshift({
     id: Date.now(),
-    date: new Date(sessionStart).toLocaleDateString(
-      currentLang === 'pl' ? 'pl-PL' : 'en-GB'),
-    startTime: new Date(sessionStart).toLocaleTimeString('en-GB', {
-      hour: '2-digit', minute: '2-digit'
-    }),
+    date: new Date(sessionStart).toLocaleDateString(currentLang === 'pl' ? 'pl-PL' : 'en-GB'),
+    startTime: new Date(sessionStart).toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' }),
     planned: plannedDuration,
-    actual: actualSecs !== null ? actualSecs : plannedDuration,
-    completed,
+    actual: actualSecs !== undefined ? actualSecs : plannedDuration,
+    completed: completed,
     sound: currentSound
   });
   localStorage.setItem('meditation_log', JSON.stringify(sessions));
@@ -459,49 +570,50 @@ function saveSession(completed, actualSecs = null) {
 
 function getSessions() {
   try { return JSON.parse(localStorage.getItem('meditation_log')) || []; }
-  catch { return []; }
+  catch (e) { return []; }
 }
 
 function formatDuration(secs) {
-  const m = Math.floor(secs / 60);
-  const s = secs % 60;
-  return s > 0 ? `${m}m ${s}s` : `${m}m`;
+  var m = Math.floor(secs / 60);
+  var s = secs % 60;
+  return s > 0 ? (m + 'm ' + s + 's') : (m + 'm');
 }
 
 function renderLog() {
-  const sessions = getSessions();
-  const totalSecs = sessions.reduce((a, s) => a + s.actual, 0);
-  const totalH = Math.floor(totalSecs / 3600);
-  const totalM = Math.floor((totalSecs % 3600) / 60);
+  var sessions = getSessions();
+  var totalSecs = sessions.reduce(function(a, s) { return a + s.actual; }, 0);
+  var totalH = Math.floor(totalSecs / 3600);
+  var totalM = Math.floor((totalSecs % 3600) / 60);
   document.getElementById('log-summary').innerHTML =
-    `${t('log_sessions')}: <strong>${sessions.length}</strong> &nbsp;
-     ${t('log_total')}: <strong>${totalH}h ${totalM}m</strong> &nbsp;
-     ${t('log_completed')}: <strong>${sessions.filter(s => s.completed).length}</strong>`;
-  document.getElementById('log-list').innerHTML = sessions.map(s => `
-    <li>
-      <div class="log-date">${s.date} &nbsp; ${s.startTime}</div>
-      <div class="log-detail">
-        ${formatDuration(s.actual)} / ${formatDuration(s.planned)} ${t('log_planned')}
-        ${!s.completed ? ` &nbsp; ${t('log_stopped')}` : ''}
-      </div>
-    </li>`).join('');
+    t('log_sessions') + ': <strong>' + sessions.length + '</strong> &nbsp; ' +
+    t('log_total') + ': <strong>' + totalH + 'h ' + totalM + 'm</strong> &nbsp; ' +
+    t('log_completed') + ': <strong>' + sessions.filter(function(s) { return s.completed; }).length + '</strong>';
+  document.getElementById('log-list').innerHTML = sessions.map(function(s) {
+    return '<li>' +
+      '<div class="log-date">' + s.date + ' &nbsp; ' + s.startTime + '</div>' +
+      '<div class="log-detail">' +
+        formatDuration(s.actual) + ' / ' + formatDuration(s.planned) + ' ' + t('log_planned') +
+        (!s.completed ? ' &nbsp; ' + t('log_stopped') : '') +
+      '</div></li>';
+  }).join('');
 }
 
-document.getElementById('btn-export').addEventListener('click', () => {
-  const sessions = getSessions();
-  const rows = [
-    ['Date', 'Start', 'Planned (s)', 'Actual (s)', 'Completed', 'Sound'],
-    ...sessions.map(s => [s.date, s.startTime, s.planned, s.actual, s.completed, s.sound])
-  ];
-  const csv = rows.map(r => r.join(',')).join('\n');
-  const blob = new Blob([csv], { type: 'text/csv' });
-  const a = document.createElement('a');
+document.getElementById('btn-export').addEventListener('click', function() {
+  var sessions = getSessions();
+  var rows = [['Date', 'Start', 'Planned (s)', 'Actual (s)', 'Completed', 'Sound']].concat(
+    sessions.map(function(s) {
+      return [s.date, s.startTime, s.planned, s.actual, s.completed, s.sound];
+    })
+  );
+  var csv = rows.map(function(r) { return r.join(','); }).join('\n');
+  var blob = new Blob([csv], { type: 'text/csv' });
+  var a = document.createElement('a');
   a.href = URL.createObjectURL(blob);
   a.download = 'meditation_log.csv';
   a.click();
 });
 
-document.getElementById('btn-clear-log').addEventListener('click', () => {
+document.getElementById('btn-clear-log').addEventListener('click', function() {
   if (confirm(t('confirm_clear'))) {
     localStorage.removeItem('meditation_log');
     renderLog();
@@ -510,18 +622,21 @@ document.getElementById('btn-clear-log').addEventListener('click', () => {
 
 // ─── Settings ────────────────────────────────────────────────────
 
-const settingsDuration = document.getElementById('settings-duration');
-const settingsSound = document.getElementById('settings-sound');
-const settingsPrepare = document.getElementById('settings-prepare');
-const settingsSaved = document.getElementById('settings-saved');
+var settingsDuration = document.getElementById('settings-duration');
+var settingsSound    = document.getElementById('settings-sound');
+var settingsPrepare  = document.getElementById('settings-prepare');
+var settingsSaved    = document.getElementById('settings-saved');
 
 function loadSettings() {
-  const dur = localStorage.getItem('settings_duration');
-  const sound = localStorage.getItem('settings_sound');
-  const prep = localStorage.getItem('settings_prepare');
+  var dur   = localStorage.getItem('settings_duration');
+  var sound = localStorage.getItem('settings_sound');
+  var prep  = localStorage.getItem('settings_prepare');
   if (dur) { settingsDuration.value = dur; }
-  if (sound) { settingsSound.value = sound; }
-  if (prep !== null) {
+  if (sound) {
+    settingsSound.value = sound;
+    soundSelect.value = sound;
+  }
+  if (prep !== null && prep !== '') {
     prepareSeconds = parseInt(prep);
     if (settingsPrepare) settingsPrepare.value = prepareSeconds;
   } else {
@@ -529,10 +644,10 @@ function loadSettings() {
   }
 }
 
-document.getElementById('btn-save-settings').addEventListener('click', () => {
-  const dur = parseInt(settingsDuration.value);
-  const sound = settingsSound.value;
-  const prep = parseInt(settingsPrepare.value);
+document.getElementById('btn-save-settings').addEventListener('click', function() {
+  var dur   = parseInt(settingsDuration.value);
+  var sound = settingsSound.value;
+  var prep  = parseInt(settingsPrepare.value);
   if (dur > 0) {
     localStorage.setItem('settings_duration', dur);
     selectPreset(dur);
@@ -544,7 +659,7 @@ document.getElementById('btn-save-settings').addEventListener('click', () => {
     localStorage.setItem('settings_prepare', prep);
   }
   settingsSaved.style.display = 'inline';
-  setTimeout(() => { settingsSaved.style.display = 'none'; }, 2000);
+  setTimeout(function() { settingsSaved.style.display = 'none'; }, 2000);
 });
 
 // ─── Init ────────────────────────────────────────────────────────
