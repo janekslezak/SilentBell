@@ -1,6 +1,6 @@
 Simple meditation timer with locally stored log, can be used as PWA.
 
-Work in progress - now mostly vibe-coded with Claude. Bell sound from 
+Work in progress - now mostly vibe-coded with Claude.
 
 For everything to work properly, you need to add to the main folder:
 
