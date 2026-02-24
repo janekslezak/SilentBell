@@ -730,7 +730,12 @@ function startSession() {
   btnStop.disabled  = false;
   setMeditating(true);
   timerInterval = setInterval(tick, 500);
+
+  // Pre-warm AudioContext while gesture is still active — required for iOS end bell
+  var ctx = getAudioContext();
+  if (ctx.state === 'suspended') ctx.resume();
 }
+
 
 function tick() {
   var now       = Date.now();
@@ -749,7 +754,35 @@ function tick() {
     setMeditating(false);
     if (noSleep) noSleep.disable();
     stopSilentLoop();
-    playEndingSequence(currentSound);
+
+    // Schedule ending bells via AudioContext clock — required for iOS
+    var ctx = getAudioContext();
+    function doEnding() {
+      var now = ctx.currentTime;
+      if (currentSound === 'none') return;
+      if (currentSound === 'chugpi') {
+        getChugpiMaster();
+        playChugpiNow(now + 0.15, 1.0);
+        playChugpiNow(now + 1.65, 1.0);
+        playChugpiNow(now + 3.15, 1.0);
+      } else if (currentSound === 'bell-high') {
+        playSingingBowlEdgeHigh(now + 0.0);
+        playTempleBellHigh(now + 1.8, 0.55);
+        playTempleBellHigh(now + 5.8, 1.0);
+        playTempleBellHigh(now + 9.8, 1.0);
+      } else {
+        playSingingBowlEdge(now + 0.0);
+        playTempleBell(now + 1.8, 0.55);
+        playTempleBell(now + 5.8, 1.0);
+        playTempleBell(now + 9.8, 1.0);
+      }
+    }
+    if (ctx.state === 'suspended') {
+      ctx.resume().then(doEnding);
+    } else {
+      doEnding();
+    }
+
     showNoteField(true, undefined);
     statusEl.textContent = t('status_complete');
     btnStart.disabled    = false;
@@ -758,6 +791,7 @@ function tick() {
     display.textContent  = formatTime(plannedDuration);
   }
 }
+
 
 function stopSession() {
   if (countdownInterval) {

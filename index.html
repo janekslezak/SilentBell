@@ -109,18 +109,19 @@
 
   </div>
 
-<div id="note-wrap" style="display:none; flex-direction:row; gap:6px; margin-top:10px; align-items:center;">
+<div id="note-wrap" style="display:none; flex-direction:column; gap:6px; margin-top:10px;">
   <input  id="note-input" type="text" maxlength="80"
-          style="flex:1; padding:7px 10px; background:var(--surface);
+          style="width:100%; padding:7px 10px; background:var(--surface);
                  border:1px solid var(--border); border-radius:var(--radius);
                  color:var(--text); font-size:0.85rem; font-family:inherit;
                  box-sizing:border-box;">
   <button id="note-save-btn"
-          style="padding:7px 12px; background:transparent; color:var(--accent);
-                 border:1px solid var(--accent); border-radius:var(--radius);
-                 font-size:0.85rem; font-family:inherit; cursor:pointer;
-                 white-space:nowrap;">Save ✓</button>
+          style="width:100%; padding:7px 0; background:transparent;
+                 color:var(--accent); border:1px solid var(--accent);
+                 border-radius:var(--radius); font-size:0.85rem;
+                 font-family:inherit; cursor:pointer;">Save ✓</button>
 </div>
+
 
 
   <!-- Log view -->
