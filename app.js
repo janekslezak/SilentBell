@@ -26,6 +26,9 @@ const STRINGS = {
     settings_duration: 'Default duration (min)',
     settings_sound:    'Sound',
     settings_prepare:  'Prepare countdown (sec)',
+    settings_notes:    'Session notes',
+    notes_on:          'Enabled',
+    notes_off:         'Disabled',
     settings_saved:    'Saved ✓',
     log_sessions:      'Sessions',
     log_total:         'Total time',
@@ -64,6 +67,9 @@ const STRINGS = {
     settings_duration: 'Domyślny czas (min)',
     settings_sound:    'Dźwięk',
     settings_prepare:  'Odliczanie przed startem (s)',
+    settings_notes:    'Notatki sesji',
+    notes_on:          'Włączone',
+    notes_off:         'Wyłączone',
     settings_saved:    'Zapisano ✓',
     log_sessions:      'Sesje',
     log_total:         'Łączny czas',
@@ -102,6 +108,9 @@ const STRINGS = {
     settings_duration: '기본 시간 (분)',
     settings_sound:    '소리',
     settings_prepare:  '준비 카운트다운 (초)',
+    settings_notes:    '세션 메모',
+    notes_on:          '활성화',
+    notes_off:         '비활성화',
     settings_saved:    '저장됨 ✓',
     log_sessions:      '세션',
     log_total:         '총 시간',
@@ -169,9 +178,20 @@ document.getElementById('btn-theme').addEventListener('click', function() {
 
 // ─── Audio Engine ────────────────────────────────────────────────
 
-var noSleep    = null;
-var audioCtx   = null;
-var silentLoop = null;
+var noSleep      = null;
+var audioCtx     = null;
+var silentLoop   = null;
+var chugpiMaster = null;
+
+function createFreshAudioContext() {
+  if (audioCtx) {
+    try { audioCtx.close(); } catch(e) {}
+  }
+  var AudioCtx = window.AudioContext || window.webkitAudioContext;
+  audioCtx     = new AudioCtx();
+  chugpiMaster = null;
+  return audioCtx;
+}
 
 function getAudioContext() {
   if (!audioCtx) {
@@ -180,6 +200,40 @@ function getAudioContext() {
   }
   return audioCtx;
 }
+
+function isContextBroken(ctx) {
+  return ctx.state === 'interrupted' || ctx.state === 'closed';
+}
+
+function ensureAudioContext() {
+  var ctx = getAudioContext();
+  if (isContextBroken(ctx)) {
+    ctx = createFreshAudioContext();
+  }
+  if (ctx.state === 'suspended' || ctx.state === 'interrupted') {
+    ctx.resume().catch(function(e) { console.warn('ctx.resume():', e); });
+  }
+  return ctx;
+}
+
+// ─── Visibility / focus recovery ─────────────────────────────────
+
+document.addEventListener('visibilitychange', function() {
+  if (document.visibilityState !== 'visible') return;
+  if (!audioCtx) return;
+  if (isContextBroken(audioCtx)) {
+    audioCtx     = null;
+    chugpiMaster = null;
+  }
+});
+
+window.addEventListener('focus', function() {
+  if (!audioCtx) return;
+  if (isContextBroken(audioCtx)) {
+    audioCtx     = null;
+    chugpiMaster = null;
+  }
+});
 
 // ─── iOS silent-switch bypass ─────────────────────────────────────
 
@@ -200,7 +254,7 @@ var SILENT_MP3 = 'data:audio/mpeg;base64,SUQzBAAAAAAA' +
 function startSilentLoop() {
   if (!silentLoop) {
     silentLoop = new Audio(SILENT_MP3);
-    silentLoop.loop = true;
+    silentLoop.loop   = true;
     silentLoop.volume = 0.01;
     silentLoop.setAttribute('playsinline', '');
     silentLoop.setAttribute('x-webkit-airplay', 'deny');
@@ -217,14 +271,23 @@ function stopSilentLoop() {
 
 function unlockAudio() {
   try {
-    var ctx = getAudioContext();
-    if (ctx.state === 'suspended') ctx.resume();
+    var ctx = ensureAudioContext();
     var buf = ctx.createBuffer(1, 512, ctx.sampleRate);
     var src = ctx.createBufferSource();
-    src.buffer = buf; src.connect(ctx.destination); src.start(0);
+    src.buffer = buf;
+    src.connect(ctx.destination);
+    src.start(0);
     startSilentLoop();
-    chugpiMaster = null; getChugpiMaster();
-  } catch(e) { console.warn('unlockAudio:', e); }
+    getChugpiMaster();
+  } catch(e) {
+    console.warn('unlockAudio:', e);
+    audioCtx     = null;
+    chugpiMaster = null;
+    try {
+      ensureAudioContext();
+      startSilentLoop();
+    } catch(e2) { console.warn('unlockAudio retry:', e2); }
+  }
 }
 
 // ─── Temple Bell Synthesizer ──────────────────────────────────────
@@ -425,7 +488,6 @@ function playSingingBowlEdgeHigh(startTime) {
 
 // ─── Chugpi (죽비) Synthesizer ────────────────────────────────────
 
-var chugpiMaster = null;
 function getChugpiMaster() {
   var ctx = getAudioContext();
   if (!chugpiMaster) {
@@ -450,8 +512,8 @@ function playChugpiNow(startTime, velocity) {
   var snapData = snapBuf.getChannelData(0);
   for (var i = 0; i < snapSize; i++)
     snapData[i] = (Math.random() * 2 - 1) * Math.pow(1 - i / snapSize, 2.5);
-  var snapSrc  = ctx.createBufferSource(); snapSrc.buffer = snapBuf;
-  var snapBpHi = ctx.createBiquadFilter();
+  var snapSrc   = ctx.createBufferSource(); snapSrc.buffer = snapBuf;
+  var snapBpHi  = ctx.createBiquadFilter();
   snapBpHi.type = 'bandpass'; snapBpHi.frequency.value = 2400; snapBpHi.Q.value = 1.2;
   var snapBpMid = ctx.createBiquadFilter();
   snapBpMid.type = 'bandpass'; snapBpMid.frequency.value = 1400; snapBpMid.Q.value = 0.9;
@@ -516,21 +578,21 @@ function playChugpiNow(startTime, velocity) {
 
 function playBell(timeSeconds) {
   timeSeconds = timeSeconds || 0;
-  var ctx = getAudioContext();
+  var ctx = ensureAudioContext();
   function doPlay() { playTempleBell(ctx.currentTime + timeSeconds); }
   if (ctx.state === 'suspended') { ctx.resume().then(doPlay); } else { doPlay(); }
 }
 
 function playBellHigh(timeSeconds) {
   timeSeconds = timeSeconds || 0;
-  var ctx = getAudioContext();
+  var ctx = ensureAudioContext();
   function doPlay() { playTempleBellHigh(ctx.currentTime + timeSeconds); }
   if (ctx.state === 'suspended') { ctx.resume().then(doPlay); } else { doPlay(); }
 }
 
 function playChugpi(timeSeconds) {
   timeSeconds = timeSeconds || 0;
-  var ctx = getAudioContext();
+  var ctx = ensureAudioContext();
   function doPlay() { playChugpiNow(ctx.currentTime + timeSeconds); }
   if (ctx.state === 'suspended') { ctx.resume().then(doPlay); } else { doPlay(); }
 }
@@ -538,9 +600,9 @@ function playChugpi(timeSeconds) {
 function playSound(type, timeSeconds) {
   timeSeconds = timeSeconds || 0;
   if (type === 'none') return;
-  if (type === 'chugpi') playChugpi(timeSeconds);
+  if (type === 'chugpi')         playChugpi(timeSeconds);
   else if (type === 'bell-high') playBellHigh(timeSeconds);
-  else playBell(timeSeconds);
+  else                           playBell(timeSeconds);
 }
 
 function playStrokes(type, count, startDelay) {
@@ -548,7 +610,7 @@ function playStrokes(type, count, startDelay) {
   if (type === 'none') return;
   var interval = type === 'chugpi' ? 1.5 : 1.4;
   if (type === 'chugpi') {
-    var ctx = getAudioContext(); getChugpiMaster();
+    var ctx = ensureAudioContext(); getChugpiMaster();
     var leadIn = 0.15;
     for (var i = 0; i < count; i++) {
       (function(delay) {
@@ -580,6 +642,7 @@ var currentSound      = 'bell';
 var selectedMinutes   = 20;
 var selectedSeconds   = 0;
 var prepareSeconds    = 10;
+var notesEnabled      = true;
 
 // ─── DOM refs ────────────────────────────────────────────────────
 
@@ -728,6 +791,8 @@ function startSession() {
   endTimestamp    = sessionStart + plannedDuration * 1000;
   nextIntervalAt  = intervalBellMs > 0 ? sessionStart + intervalBellMs : null;
 
+  ensureAudioContext();
+
   if (currentSound === 'chugpi') playStrokes('chugpi', 3);
   else playStrokes(currentSound, 1);
 
@@ -736,15 +801,6 @@ function startSession() {
   btnStop.disabled  = false;
   setMeditating(true);
   timerInterval = setInterval(tick, 500);
-
-  var ctx = getAudioContext();
-  if (ctx.state === 'suspended') ctx.resume();
-
-  var msUntilEnd = plannedDuration * 1000;
-  setTimeout(function() {
-    var ctx = getAudioContext();
-    if (ctx.state === 'suspended') ctx.resume();
-  }, Math.max(0, msUntilEnd - 2000));
 }
 
 function tick() {
@@ -764,7 +820,7 @@ function tick() {
     setMeditating(false);
     if (noSleep) noSleep.disable();
 
-    var ctx = getAudioContext();
+    var ctx = ensureAudioContext();
     function doEnding() {
       var now = ctx.currentTime;
       if (currentSound === 'none') { stopSilentLoop(); return; }
@@ -788,7 +844,9 @@ function tick() {
     }
     if (ctx.state === 'suspended') { ctx.resume().then(doEnding); } else { doEnding(); }
 
-    showNoteField(true, undefined);
+    if (notesEnabled) showNoteField(true, undefined);
+    else saveSession(true, undefined, '');
+
     statusEl.textContent = t('status_complete');
     btnStart.disabled    = false;
     btnStop.disabled     = true;
@@ -816,7 +874,10 @@ function stopSession() {
   if (noSleep) noSleep.disable();
   stopSilentLoop();
   var actual = Math.round((Date.now() - sessionStart) / 1000);
-  showNoteField(false, actual);
+
+  if (notesEnabled) showNoteField(false, actual);
+  else saveSession(false, actual, '');
+
   statusEl.textContent = t('status_stopped');
   btnStart.disabled    = false;
   btnStop.disabled     = true;
@@ -883,16 +944,6 @@ function formatDuration(secs) {
   var s = secs % 60;
   return s > 0 ? (m + 'm ' + s + 's') : (m + 'm');
 }
-
-// ─── Test Sound ───────────────────────────────────────────────────
-
-document.getElementById('btn-test-sound').addEventListener('click', function() {
-  unlockAudio();
-  var type = document.getElementById('settings-sound').value;
-  if (type === 'chugpi') playStrokes('chugpi', 1);
-  else if (type !== 'none') playSound(type);
-});
-
 
 // ─── Streak ───────────────────────────────────────────────────────
 
@@ -1135,12 +1186,14 @@ document.getElementById('btn-clear-log').addEventListener('click', function() {
 var settingsDuration = document.getElementById('settings-duration');
 var settingsSound    = document.getElementById('settings-sound');
 var settingsPrepare  = document.getElementById('settings-prepare');
+var settingsNotes    = document.getElementById('settings-notes');
 
 function loadSettings() {
   var dur      = localStorage.getItem('settings_duration');
   var sound    = localStorage.getItem('settings_sound');
   var prep     = localStorage.getItem('settings_prepare');
   var interval = localStorage.getItem('settings_interval');
+  var notes    = localStorage.getItem('settings_notes');
 
   if (dur) {
     settingsDuration.value = dur;
@@ -1154,6 +1207,11 @@ function loadSettings() {
   var p = (prep !== null && prep !== '') ? parseInt(prep) : prepareSeconds;
   prepareSeconds = p;
   if (settingsPrepare) settingsPrepare.value = p;
+
+  if (notes) {
+    notesEnabled        = notes === 'on';
+    settingsNotes.value = notes;
+  }
 }
 
 settingsSound.addEventListener('change', function() {
@@ -1183,6 +1241,11 @@ settingsPrepare.addEventListener('change', function() {
   }
 });
 
+settingsNotes.addEventListener('change', function() {
+  notesEnabled = settingsNotes.value === 'on';
+  localStorage.setItem('settings_notes', settingsNotes.value);
+});
+
 // ─── Test Sound ───────────────────────────────────────────────────
 
 document.getElementById('btn-test-sound').addEventListener('click', function() {
@@ -1191,7 +1254,6 @@ document.getElementById('btn-test-sound').addEventListener('click', function() {
   if (type === 'chugpi') playStrokes('chugpi', 1);
   else if (type !== 'none') playSound(type);
 });
-
 
 // ─── iOS Install Banner ───────────────────────────────────────────
 
