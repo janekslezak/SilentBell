@@ -27,7 +27,7 @@ const STRINGS = {
     settings_sound:    'Default sound',
     settings_prepare:  'Prepare countdown (sec)',
     settings_saved:    'Saved ✓',
-    custom_placeholder:'Custom min',
+    custom_placeholder:'Custom time',
     log_sessions:      'Sessions',
     log_total:         'Total time',
     log_completed:     'Completed',

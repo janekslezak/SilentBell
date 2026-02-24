@@ -4,18 +4,13 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <meta name="theme-color" content="#111820" />
-  <meta name="mobile-web-app-capable" content="yes" />
   <meta name="apple-mobile-web-app-capable" content="yes" />
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+  <meta name="apple-mobile-web-app-title" content="Silent Bell" />
   <title>Silent Bell</title>
   <link rel="manifest" href="manifest.json" />
   <link rel="apple-touch-icon" href="icon-192.png" />
   <link rel="stylesheet" href="style.css" />
-  <meta name="apple-mobile-web-app-capable" content="yes">
-  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-  <meta name="apple-mobile-web-app-title" content="Silent Bell">
-<link rel="apple-touch-icon" href="icon-192.jpg">
-
 </head>
 <body>
 
@@ -43,6 +38,24 @@
     <div id="display">20:00</div>
     <div id="status" data-i18n="status_ready">Ready</div>
 
+    <div class="controls">
+      <button id="btn-start" data-i18n="btn_start">Start</button>
+      <button id="btn-stop"  data-i18n="btn_stop" disabled>Stop</button>
+    </div>
+
+    <div id="note-wrap" style="display:none; flex-direction:column; gap:6px; margin-top:10px;">
+      <input id="note-input" type="text" maxlength="80"
+             style="width:100%; padding:7px 10px; background:var(--surface);
+                    border:1px solid var(--border); border-radius:var(--radius);
+                    color:var(--text); font-size:0.85rem; font-family:inherit;
+                    box-sizing:border-box;">
+      <button id="note-save-btn"
+              style="width:100%; padding:7px 0; background:transparent;
+                     color:var(--accent); border:1px solid var(--accent);
+                     border-radius:var(--radius); font-size:0.85rem;
+                     font-family:inherit; cursor:pointer;">Save ✓</button>
+    </div>
+
     <div class="duration-presets">
       <button class="preset" data-min="5">5 min</button>
       <button class="preset" data-min="10">10 min</button>
@@ -55,7 +68,7 @@
     <div class="custom-row">
       <input type="number" id="custom-min" min="1" max="480"
              data-i18n-placeholder="custom_placeholder"
-             placeholder="Custom min" />
+             placeholder="Custom time" />
     </div>
 
     <div class="field-group">
@@ -79,7 +92,6 @@
       </select>
     </div>
 
-    <!-- Lotus shown only while meditating via CSS -->
     <div class="lotus-figure">
       <svg viewBox="0 0 100 80" xmlns="http://www.w3.org/2000/svg" class="lotus-svg">
         <path d="M 50,60 C 44,45 44,28 50,18 C 56,28 56,45 50,60 Z"
@@ -101,28 +113,7 @@
       </svg>
     </div>
 
-    <!-- Both buttons always in DOM, CSS controls visibility -->
-    <div class="controls">
-      <button id="btn-start" data-i18n="btn_start">Start</button>
-      <button id="btn-stop"  data-i18n="btn_stop" disabled>Stop</button>
-    </div>
-
-  </div>
-
-<div id="note-wrap" style="display:none; flex-direction:column; gap:6px; margin-top:10px;">
-  <input  id="note-input" type="text" maxlength="80"
-          style="width:100%; padding:7px 10px; background:var(--surface);
-                 border:1px solid var(--border); border-radius:var(--radius);
-                 color:var(--text); font-size:0.85rem; font-family:inherit;
-                 box-sizing:border-box;">
-  <button id="note-save-btn"
-          style="width:100%; padding:7px 0; background:transparent;
-                 color:var(--accent); border:1px solid var(--accent);
-                 border-radius:var(--radius); font-size:0.85rem;
-                 font-family:inherit; cursor:pointer;">Save ✓</button>
-</div>
-
-
+  </div><!-- end #view-timer -->
 
   <!-- Log view -->
   <div id="view-log" class="view">
@@ -162,36 +153,36 @@
     <span id="settings-saved" style="display:none" data-i18n="settings_saved">Saved ✓</span>
   </div>
 
+  <!-- iOS install banner -->
+  <div id="ios-install-banner" style="display:none">
+    <span id="ios-install-text">To install: tap
+      <svg width="16" height="16" viewBox="0 0 50 50" fill="currentColor"
+           style="vertical-align:middle;margin:0 2px">
+        <path d="M30.3 8.5 25 3.2l-5.3 5.3 1.4 1.4 3-3V32h2V6.9l3 3z"/>
+        <path d="M9 16v28h32V16H28v2h11v24H11V18h11v-2z"/>
+      </svg>
+      then "Add to Home Screen"
+    </span>
+    <button id="ios-install-close">✕</button>
+  </div>
+
   <script src="NoSleep.min.js"></script>
   <script src="app.js"></script>
 
-<div id="ios-install-banner" style="display:none">
-  <span id="ios-install-text">To install: tap
-    <svg width="16" height="16" viewBox="0 0 50 50" fill="currentColor"
-         style="vertical-align:middle;margin:0 2px">
-      <path d="M30.3 8.5 25 3.2l-5.3 5.3 1.4 1.4 3-3V32h2V6.9l3 3z"/>
-      <path d="M9 16v28h32V16H28v2h11v24H11V18h11v-2z"/>
-    </svg>
-    then "Add to Home Screen"
-  </span>
-  <button id="ios-install-close">✕</button>
-</div>
+  <footer class="footer">
+    <div class="container">
+      <div class="footer-row">
+        <p>&copy; 2026 Silent Bell</p>
+      </div>
+      <div class="footer-row">
+        <p><a href="https://github.com/janekslezak/SilentBell" target="_blank" rel="noopener">GitHub</a> - <a href="https://github.com/janekslezak/SilentBell/blob/main/CODE_OF_CONDUCT.md" target="_blank" rel="noopener">Code of Conduct</a></p>
+      </div>
+      <div class="footer-row">
+        <p>This site is powered by <a href="https://www.netlify.com" target="_blank" rel="noopener">Netlify</a>.</p>
+      </div>
+    </div>
+  </footer>
 
 </body>
-
-<footer class="footer">
-  <div class="container">
-    <div class="footer-row">
-      <p>&copy; 2026 Silent Bell</p>
-    </div>
-    <div class="footer-row">
-      <p><a href="https://github.com/janekslezak/SilentBell" target="_blank" rel="noopener">GitHub</a> - <a href="https://github.com/janekslezak/SilentBell/blob/main/CODE_OF_CONDUCT.md" target="_blank" rel="noopener">Code of Conduct</a></p>
-    </div>
-    <div class="footer-row">
-      <p>This site is powered by <a href="https://www.netlify.com" target="_blank" rel="noopener">Netlify</a>.</p>
-    </div>
-  </div>
-</footer>
-
 </html>
 
