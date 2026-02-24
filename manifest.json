@@ -1,6 +1,7 @@
 {
   "name": "Silent Bell 침묵의 종",
   "short_name": "Silent Bell",
+  "lang": "en",
   "start_url": "/",
   "display": "minimal-ui",
   "background_color": "#111820",
@@ -20,4 +21,3 @@
     }
   ]
 }
-

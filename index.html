@@ -11,6 +11,11 @@
   <link rel="manifest" href="manifest.json" />
   <link rel="apple-touch-icon" href="icon-192.png" />
   <link rel="stylesheet" href="style.css" />
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="apple-mobile-web-app-title" content="Silent Bell">
+<link rel="apple-touch-icon" href="icon-192.jpg">
+
 </head>
 <body>
 
@@ -20,7 +25,8 @@
       <span class="header-title" data-i18n="app_title">Silent Bell</span>
     </div>
     <div class="header-controls">
-      <button id="btn-lang">PL</button>
+      <button class="btn-lang" data-lang="pl">PL</button>
+      <button class="btn-lang" data-lang="ko">한</button>
       <button id="btn-theme">☀️</button>
     </div>
   </header>
@@ -55,14 +61,15 @@
     <div class="field-group">
       <label class="field-label" data-i18n="label_sound">Sound</label>
       <select id="sound-select">
-        <option value="bell"   data-i18n="sound_bell">Bell</option>
-        <option value="chugpi" data-i18n="sound_chugpi">Jugbi 죽비</option>
-        <option value="none"   data-i18n="sound_silent">Silent</option>
+        <option value="bell"      data-i18n="sound_bell">Bell</option>
+        <option value="bell-high" data-i18n="sound_bell_high">Bell (Higher pitch)</option>
+        <option value="chugpi"    data-i18n="sound_chugpi">Jugbi 죽비</option>
+        <option value="none"      data-i18n="sound_silent">Silent</option>
       </select>
     </div>
 
     <div class="field-group">
-      <label class="field-label" data-i18n="label_interval">Interval bells every</label>
+      <label class="field-label" data-i18n="label_interval">Interval sound every</label>
       <select id="interval-select">
         <option value="0"  data-i18n="interval_none">None</option>
         <option value="5">5 min</option>
@@ -102,10 +109,25 @@
 
   </div>
 
+<div id="note-wrap" style="display:none; flex-direction:row; gap:6px; margin-top:10px; align-items:center;">
+  <input  id="note-input" type="text" maxlength="80"
+          style="flex:1; padding:7px 10px; background:var(--surface);
+                 border:1px solid var(--border); border-radius:var(--radius);
+                 color:var(--text); font-size:0.85rem; font-family:inherit;
+                 box-sizing:border-box;">
+  <button id="note-save-btn"
+          style="padding:7px 12px; background:transparent; color:var(--accent);
+                 border:1px solid var(--accent); border-radius:var(--radius);
+                 font-size:0.85rem; font-family:inherit; cursor:pointer;
+                 white-space:nowrap;">Save ✓</button>
+</div>
+
+
   <!-- Log view -->
   <div id="view-log" class="view">
     <h2 data-i18n="nav_log">Log</h2>
     <div id="log-summary"></div>
+    <div id="log-chart"></div>
     <ul id="log-list"></ul>
     <button id="btn-export"    data-i18n="btn_export">Export CSV</button>
     <button id="btn-clear-log" data-i18n="btn_clear">Clear Log</button>
@@ -123,9 +145,10 @@
     <div class="field-group">
       <label class="field-label" data-i18n="settings_sound">Default sound</label>
       <select id="settings-sound">
-        <option value="bell"   data-i18n="sound_bell">Bell</option>
-        <option value="chugpi" data-i18n="sound_chugpi">Jugbi 죽비</option>
-        <option value="none"   data-i18n="sound_silent">Silent</option>
+        <option value="bell"      data-i18n="sound_bell">Bell</option>
+        <option value="bell-high" data-i18n="sound_bell_high">Bell (Higher pitch)</option>
+        <option value="chugpi"    data-i18n="sound_chugpi">Jugbi 죽비</option>
+        <option value="none"      data-i18n="sound_silent">Silent</option>
       </select>
     </div>
 
@@ -140,6 +163,18 @@
 
   <script src="NoSleep.min.js"></script>
   <script src="app.js"></script>
+
+<div id="ios-install-banner" style="display:none">
+  <span id="ios-install-text">To install: tap
+    <svg width="16" height="16" viewBox="0 0 50 50" fill="currentColor"
+         style="vertical-align:middle;margin:0 2px">
+      <path d="M30.3 8.5 25 3.2l-5.3 5.3 1.4 1.4 3-3V32h2V6.9l3 3z"/>
+      <path d="M9 16v28h32V16H28v2h11v24H11V18h11v-2z"/>
+    </svg>
+    then "Add to Home Screen"
+  </span>
+  <button id="ios-install-close">✕</button>
+</div>
 
 </body>
 

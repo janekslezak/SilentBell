@@ -12,8 +12,9 @@ const STRINGS = {
     status_stopped:    'Stopped early',
     status_prepare:    'Prepare… {secs}s',
     label_sound:       'Sound',
-    label_interval:    'Interval bells every',
+    label_interval:    'Interval sound every',
     sound_bell:        'Bell',
+    sound_bell_high:   'Bell (Higher pitch)',
     sound_chugpi:      'Jugbi 죽비',
     sound_silent:      'Silent',
     interval_none:     'None',
@@ -32,7 +33,12 @@ const STRINGS = {
     log_completed:     'Completed',
     log_planned:       'planned',
     log_stopped:       '⚠ stopped early',
-    confirm_clear:     'Clear all session history?'
+    confirm_clear:     'Clear all session history?',
+    ios_install:       'To install: tap the Share button ↑ then "Add to Home Screen"',
+    log_streak:        'Streak',
+    log_days:          'days',
+    note_placeholder:  'Note (optional)',
+    note_save:         'Save ✓'
   },
   pl: {
     app_title:         'Dzwon Ciszy',
@@ -45,8 +51,9 @@ const STRINGS = {
     status_stopped:    'Przerwano',
     status_prepare:    'Przygotuj się… {secs}s',
     label_sound:       'Dźwięk',
-    label_interval:    'Dzwon co',
+    label_interval:    'Dźwięk co każde',
     sound_bell:        'Dzwon',
+    sound_bell_high:   'Dzwon (Wyższy dźwięk)',
     sound_chugpi:      'Jugbi 죽비',
     sound_silent:      'Cisza',
     interval_none:     'Brak',
@@ -65,7 +72,52 @@ const STRINGS = {
     log_completed:     'Ukończone',
     log_planned:       'zaplanowano',
     log_stopped:       '⚠ przerwano',
-    confirm_clear:     'Wyczyścić historię sesji?'
+    confirm_clear:     'Wyczyścić historię sesji?',
+    ios_install:       'Aby zainstalować: wybierz Udostępnij ↑, potem „Dodaj do ekranu głównego"',
+    log_streak:        'Seria',
+    log_days:          'dni',
+    note_placeholder:  'Notatka (opcjonalna)',
+    note_save:         'Zapisz ✓'
+}
+  ,
+  ko: {
+    app_title:         '침묵의 종',
+    nav_timer:         '타이머',
+    nav_log:           '기록',
+    nav_settings:      '설정',
+    status_ready:      '준비',
+    status_meditating: '명상 중…',
+    status_complete:   '세션 완료 🙏',
+    status_stopped:    '중단됨',
+    status_prepare:    '준비하세요… {secs}초',
+    label_sound:       '소리',
+    label_interval:    '간격 소리 (매)',
+    sound_bell:        '범종',
+    sound_bell_high:   '범종 (높은 음)',
+    sound_chugpi:      '죽비',
+    sound_silent:      '무음',
+    interval_none:     '없음',
+    btn_start:         '시작',
+    btn_stop:          '정지',
+    btn_export:        'CSV 내보내기',
+    btn_clear:         '기록 삭제',
+    btn_save:          '저장',
+    settings_duration: '기본 시간 (분)',
+    settings_sound:    '기본 소리',
+    settings_prepare:  '준비 카운트다운 (초)',
+    settings_saved:    '저장됨 ✓',
+    custom_placeholder:'직접 입력 (분)',
+    log_sessions:      '세션',
+    log_total:         '총 시간',
+    log_completed:     '완료',
+    log_planned:       '계획',
+    log_stopped:       '⚠ 중단됨',
+    confirm_clear:     '모든 세션 기록을 삭제하시겠습니까?',
+    ios_install:       '설치하려면: 공유 버튼을 탭한 후 "홈 화면에 추가"를 선택하세요',
+    log_streak:        '연속',
+    log_days:          '일',
+    note_placeholder:  '메모 (선택)',
+    note_save:         '저장 ✓'
   }
 };
 
@@ -86,7 +138,14 @@ function applyLang() {
   document.querySelectorAll('[data-i18n-placeholder]').forEach(function(el) {
     el.placeholder = t(el.dataset.i18nPlaceholder);
   });
-  document.getElementById('btn-lang').textContent = currentLang === 'en' ? 'PL' : 'EN';
+  var allLangs = ['en', 'pl', 'ko'];
+  var otherLangs = allLangs.filter(function(l) { return l !== currentLang; });
+  var langDisplay = { en: 'EN', pl: 'PL', ko: '한' };
+  var btns = document.querySelectorAll('.btn-lang');
+  btns.forEach(function(btn, i) {
+    btn.dataset.lang = otherLangs[i];
+    btn.textContent = langDisplay[otherLangs[i]];
+  });
   var logView = document.getElementById('view-log');
   if (logView && logView.classList.contains('active')) renderLog();
 }
@@ -98,10 +157,12 @@ function applyTheme() {
   if (meta) meta.content = currentTheme === 'dark' ? '#111820' : '#f0ece4';
 }
 
-document.getElementById('btn-lang').addEventListener('click', function() {
-  currentLang = currentLang === 'en' ? 'pl' : 'en';
-  localStorage.setItem('lang', currentLang);
-  applyLang();
+document.querySelectorAll('.btn-lang').forEach(function(btn) {
+  btn.addEventListener('click', function() {
+    currentLang = btn.dataset.lang;
+    localStorage.setItem('lang', currentLang);
+    applyLang();
+  });
 });
 
 document.getElementById('btn-theme').addEventListener('click', function() {
@@ -164,10 +225,9 @@ function unlockAudio() {
     if (ctx.state === 'suspended') ctx.resume();
     var buf = ctx.createBuffer(1, 512, ctx.sampleRate);
     var src = ctx.createBufferSource();
-    src.buffer = buf;
-    src.connect(ctx.destination);
-    src.start(0);
+    src.buffer = buf; src.connect(ctx.destination); src.start(0);
     startSilentLoop();
+    chugpiMaster = null; getChugpiMaster();
   } catch(e) { console.warn('unlockAudio:', e); }
 }
 
@@ -177,125 +237,309 @@ function playTempleBell(startTime, velocity) {
   velocity = velocity !== undefined ? velocity : 1.0;
   var ctx = getAudioContext();
   var t0  = startTime;
-
   var master = ctx.createDynamicsCompressor();
-  master.threshold.value = -6;
-  master.knee.value      = 6;
-  master.ratio.value     = 3;
-  master.attack.value    = 0.003;
-  master.release.value   = 0.25;
-  master.connect(ctx.destination);
-
-  // Strike transient
+  master.threshold.value = -18; master.knee.value = 20; master.ratio.value = 1.5;
+  master.attack.value = 0.02; master.release.value = 0.5;
+  var lpf = ctx.createBiquadFilter();
+  lpf.type = 'lowpass'; lpf.frequency.value = 6000; lpf.Q.value = 0.5;
+  var tailFade = ctx.createGain();
+  tailFade.gain.setValueAtTime(1.0, t0);
+  tailFade.gain.setValueAtTime(1.0, t0 + 10.0);
+  tailFade.gain.exponentialRampToValueAtTime(0.0001, t0 + 17.0);
+  master.connect(lpf); lpf.connect(tailFade); tailFade.connect(ctx.destination);
   var clankSize = Math.floor(ctx.sampleRate * 0.04);
   var clankBuf  = ctx.createBuffer(1, clankSize, ctx.sampleRate);
   var clankData = clankBuf.getChannelData(0);
   for (var i = 0; i < clankSize; i++)
-    clankData[i] = (Math.random() * 2 - 1) * Math.pow(1 - i / clankSize, 2);
+    clankData[i] = (Math.random() * 2 - 1) * Math.pow(1 - i / clankSize, 3);
   var clankSrc = ctx.createBufferSource();
   clankSrc.buffer = clankBuf;
   var clankBp = ctx.createBiquadFilter();
-  clankBp.type = 'bandpass';
-  clankBp.frequency.value = 6000;
-  clankBp.Q.value = 0.8;
+  clankBp.type = 'bandpass'; clankBp.frequency.value = 4000; clankBp.Q.value = 0.5;
   var clankGain = ctx.createGain();
-  clankGain.gain.setValueAtTime(0.001, t0);
-  clankGain.gain.linearRampToValueAtTime(1.2 * velocity, t0 + 0.002);
-  clankGain.gain.exponentialRampToValueAtTime(0.001, t0 + 0.06);
-  clankSrc.connect(clankBp);
-  clankBp.connect(clankGain);
-  clankGain.connect(master);
-  clankSrc.start(t0);
-  clankSrc.stop(t0 + 0.07);
-
-  // Sinusoidal partial helper
+  clankGain.gain.setValueAtTime(0.0, t0);
+  clankGain.gain.linearRampToValueAtTime(0.30 * velocity, t0 + 0.004);
+  clankGain.gain.exponentialRampToValueAtTime(0.001, t0 + 0.07);
+  clankSrc.connect(clankBp); clankBp.connect(clankGain); clankGain.connect(master);
+  clankSrc.start(t0); clankSrc.stop(t0 + 0.08);
   function addPartial(freq, gainPeak, attackTime, decayTime) {
     var osc = ctx.createOscillator();
-    osc.type = 'sine';
-    osc.frequency.value = freq;
+    osc.type = 'sine'; osc.frequency.value = freq;
     var env = ctx.createGain();
-    env.gain.setValueAtTime(0.001, t0);
+    env.gain.setValueAtTime(0.0, t0);
     env.gain.linearRampToValueAtTime(gainPeak * velocity, t0 + attackTime);
     env.gain.exponentialRampToValueAtTime(0.0001, t0 + decayTime);
-    osc.connect(env);
-    env.connect(master);
-    osc.start(t0);
-    osc.stop(t0 + decayTime + 0.1);
+    osc.connect(env); env.connect(master);
+    osc.start(t0); osc.stop(t0 + decayTime + 2.0);
   }
-
-  // Fundamental + inharmonic partials
-  addPartial(110,  0.55, 0.012, 14.0);
-  addPartial(304,  0.40, 0.008,  9.0);
-  addPartial(594,  0.28, 0.006,  6.5);
-  addPartial(982,  0.18, 0.004,  4.0);
-  addPartial(1627, 0.10, 0.003,  2.5);
-
-  // Shimmer tremolo
-  var shimmerLfo  = ctx.createOscillator();
-  shimmerLfo.type = 'sine';
-  shimmerLfo.frequency.value = 4.5;
-  var shimmerDepth = ctx.createGain();
-  shimmerDepth.gain.value = 0.06;
-  var shimmerFund  = ctx.createOscillator();
-  shimmerFund.type = 'sine';
-  shimmerFund.frequency.value = 110;
+  addPartial(110,  0.32, 0.015, 16.0);
+  addPartial(304,  0.22, 0.010, 11.0);
+  addPartial(594,  0.14, 0.008,  8.0);
+  addPartial(982,  0.08, 0.005,  5.5);
+  addPartial(1627, 0.04, 0.004,  3.5);
+  var shimmerLfo = ctx.createOscillator();
+  shimmerLfo.type = 'sine'; shimmerLfo.frequency.value = 4.5;
+  var shimmerDepth = ctx.createGain(); shimmerDepth.gain.value = 0.02;
+  var shimmerFund = ctx.createOscillator();
+  shimmerFund.type = 'sine'; shimmerFund.frequency.value = 110;
   var shimmerEnv = ctx.createGain();
-  shimmerEnv.gain.setValueAtTime(0.001, t0);
-  shimmerEnv.gain.linearRampToValueAtTime(0.15 * velocity, t0 + 0.05);
+  shimmerEnv.gain.setValueAtTime(0.0, t0);
+  shimmerEnv.gain.linearRampToValueAtTime(0.06 * velocity, t0 + 0.08);
   shimmerEnv.gain.exponentialRampToValueAtTime(0.0001, t0 + 14.0);
-  shimmerLfo.connect(shimmerDepth);
-  shimmerDepth.connect(shimmerEnv.gain);
-  shimmerFund.connect(shimmerEnv);
-  shimmerEnv.connect(master);
-  shimmerLfo.start(t0);  shimmerFund.start(t0);
-  shimmerLfo.stop(t0 + 14.1); shimmerFund.stop(t0 + 14.1);
+  shimmerLfo.connect(shimmerDepth); shimmerDepth.connect(shimmerEnv.gain);
+  shimmerFund.connect(shimmerEnv); shimmerEnv.connect(master);
+  shimmerLfo.start(t0); shimmerFund.start(t0);
+  shimmerLfo.stop(t0 + 16.0); shimmerFund.stop(t0 + 16.0);
+}
+
+// ─── Temple Bell — Higher Pitch (partials ~1.5x, perfect fifth up) ─
+function playTempleBellHigh(startTime, velocity) {
+  velocity = velocity !== undefined ? velocity : 1.0;
+  var ctx = getAudioContext();
+  var t0  = startTime;
+  var master = ctx.createDynamicsCompressor();
+  master.threshold.value = -18; master.knee.value = 20; master.ratio.value = 1.5;
+  master.attack.value = 0.02; master.release.value = 0.5;
+  var lpf = ctx.createBiquadFilter();
+  lpf.type = 'lowpass'; lpf.frequency.value = 7000; lpf.Q.value = 0.5;
+  var tailFade = ctx.createGain();
+  tailFade.gain.setValueAtTime(1.0, t0);
+  tailFade.gain.setValueAtTime(1.0, t0 + 8.0);
+  tailFade.gain.exponentialRampToValueAtTime(0.0001, t0 + 14.0);
+  master.connect(lpf); lpf.connect(tailFade); tailFade.connect(ctx.destination);
+  var clankSize = Math.floor(ctx.sampleRate * 0.035);
+  var clankBuf  = ctx.createBuffer(1, clankSize, ctx.sampleRate);
+  var clankData = clankBuf.getChannelData(0);
+  for (var i = 0; i < clankSize; i++)
+    clankData[i] = (Math.random() * 2 - 1) * Math.pow(1 - i / clankSize, 3);
+  var clankSrc = ctx.createBufferSource();
+  clankSrc.buffer = clankBuf;
+  var clankBp = ctx.createBiquadFilter();
+  clankBp.type = 'bandpass'; clankBp.frequency.value = 5500; clankBp.Q.value = 0.5;
+  var clankGain = ctx.createGain();
+  clankGain.gain.setValueAtTime(0.0, t0);
+  clankGain.gain.linearRampToValueAtTime(0.30 * velocity, t0 + 0.003);
+  clankGain.gain.exponentialRampToValueAtTime(0.001, t0 + 0.06);
+  clankSrc.connect(clankBp); clankBp.connect(clankGain); clankGain.connect(master);
+  clankSrc.start(t0); clankSrc.stop(t0 + 0.07);
+  function addPartial(freq, gainPeak, attackTime, decayTime) {
+    var osc = ctx.createOscillator();
+    osc.type = 'sine'; osc.frequency.value = freq;
+    var env = ctx.createGain();
+    env.gain.setValueAtTime(0.0, t0);
+    env.gain.linearRampToValueAtTime(gainPeak * velocity, t0 + attackTime);
+    env.gain.exponentialRampToValueAtTime(0.0001, t0 + decayTime);
+    osc.connect(env); env.connect(master);
+    osc.start(t0); osc.stop(t0 + decayTime + 2.0);
+  }
+  addPartial(165,  0.32, 0.012, 12.0);
+  addPartial(456,  0.22, 0.008,  8.5);
+  addPartial(891,  0.14, 0.006,  6.0);
+  addPartial(1473, 0.08, 0.004,  4.0);
+  addPartial(2440, 0.04, 0.003,  2.5);
+  var shimmerLfo = ctx.createOscillator();
+  shimmerLfo.type = 'sine'; shimmerLfo.frequency.value = 5.5;
+  var shimmerDepth = ctx.createGain(); shimmerDepth.gain.value = 0.02;
+  var shimmerFund = ctx.createOscillator();
+  shimmerFund.type = 'sine'; shimmerFund.frequency.value = 165;
+  var shimmerEnv = ctx.createGain();
+  shimmerEnv.gain.setValueAtTime(0.0, t0);
+  shimmerEnv.gain.linearRampToValueAtTime(0.06 * velocity, t0 + 0.07);
+  shimmerEnv.gain.exponentialRampToValueAtTime(0.0001, t0 + 11.0);
+  shimmerLfo.connect(shimmerDepth); shimmerDepth.connect(shimmerEnv.gain);
+  shimmerFund.connect(shimmerEnv); shimmerEnv.connect(master);
+  shimmerLfo.start(t0); shimmerFund.start(t0);
+  shimmerLfo.stop(t0 + 13.0); shimmerFund.stop(t0 + 13.0);
+}
+
+
+// ─── Singing Bowl Edge (standard pitch) ──────────────────────────
+function playSingingBowlEdge(startTime) {
+  var ctx = getAudioContext(); var t0 = startTime;
+  var master = ctx.createDynamicsCompressor();
+  master.threshold.value = -18; master.knee.value = 20; master.ratio.value = 1.5;
+  master.attack.value = 0.05; master.release.value = 0.6;
+  var lpf = ctx.createBiquadFilter();
+  lpf.type = 'lowpass'; lpf.frequency.value = 5000; lpf.Q.value = 0.5;
+  master.connect(lpf); lpf.connect(ctx.destination);
+  var noiseSize = Math.floor(ctx.sampleRate * 0.8);
+  var noiseBuf = ctx.createBuffer(1, noiseSize, ctx.sampleRate);
+  var noiseData = noiseBuf.getChannelData(0);
+  for (var i = 0; i < noiseSize; i++) {
+    var hann = 0.5 * (1 - Math.cos(2 * Math.PI * i / (noiseSize - 1)));
+    noiseData[i] = (Math.random() * 2 - 1) * hann;
+  }
+  var noiseSrc = ctx.createBufferSource(); noiseSrc.buffer = noiseBuf;
+  var bp1 = ctx.createBiquadFilter(); bp1.type = 'bandpass'; bp1.frequency.value = 220; bp1.Q.value = 8.0;
+  var bp2 = ctx.createBiquadFilter(); bp2.type = 'bandpass'; bp2.frequency.value = 220; bp2.Q.value = 8.0;
+  var noiseGain = ctx.createGain();
+  noiseGain.gain.setValueAtTime(0.0, t0);
+  noiseGain.gain.linearRampToValueAtTime(0.15, t0 + 0.5);
+  noiseGain.gain.linearRampToValueAtTime(0.12, t0 + 0.7);
+  noiseGain.gain.linearRampToValueAtTime(0.0, t0 + 0.85);
+  noiseSrc.connect(bp1); bp1.connect(bp2); bp2.connect(noiseGain); noiseGain.connect(master);
+  noiseSrc.start(t0); noiseSrc.stop(t0 + 0.9);
+  function addEdgePartial(freq, gainPeak, decayTime) {
+    var osc = ctx.createOscillator(); osc.type = 'sine'; osc.frequency.value = freq;
+    var env = ctx.createGain();
+    env.gain.setValueAtTime(0.0, t0); env.gain.linearRampToValueAtTime(gainPeak, t0 + 0.35);
+    env.gain.setValueAtTime(gainPeak, t0 + 0.55); env.gain.exponentialRampToValueAtTime(0.0001, t0 + decayTime);
+    osc.connect(env); env.connect(master); osc.start(t0); osc.stop(t0 + decayTime + 1.5);
+  }
+  addEdgePartial(110, 0.07, 5.5); addEdgePartial(304, 0.04, 3.5); addEdgePartial(594, 0.02, 2.0);
+}
+
+// ─── Singing Bowl Edge (higher pitch) ────────────────────────────
+function playSingingBowlEdgeHigh(startTime) {
+  var ctx = getAudioContext(); var t0 = startTime;
+  var master = ctx.createDynamicsCompressor();
+  master.threshold.value = -18; master.knee.value = 20; master.ratio.value = 1.5;
+  master.attack.value = 0.05; master.release.value = 0.6;
+  var lpf = ctx.createBiquadFilter();
+  lpf.type = 'lowpass'; lpf.frequency.value = 6000; lpf.Q.value = 0.5;
+  master.connect(lpf); lpf.connect(ctx.destination);
+  var noiseSize = Math.floor(ctx.sampleRate * 0.8);
+  var noiseBuf = ctx.createBuffer(1, noiseSize, ctx.sampleRate);
+  var noiseData = noiseBuf.getChannelData(0);
+  for (var i = 0; i < noiseSize; i++) {
+    var hann = 0.5 * (1 - Math.cos(2 * Math.PI * i / (noiseSize - 1)));
+    noiseData[i] = (Math.random() * 2 - 1) * hann;
+  }
+  var noiseSrc = ctx.createBufferSource(); noiseSrc.buffer = noiseBuf;
+  var bp1 = ctx.createBiquadFilter(); bp1.type = 'bandpass'; bp1.frequency.value = 330; bp1.Q.value = 8.0;
+  var bp2 = ctx.createBiquadFilter(); bp2.type = 'bandpass'; bp2.frequency.value = 330; bp2.Q.value = 8.0;
+  var noiseGain = ctx.createGain();
+  noiseGain.gain.setValueAtTime(0.0, t0);
+  noiseGain.gain.linearRampToValueAtTime(0.15, t0 + 0.45);
+  noiseGain.gain.linearRampToValueAtTime(0.12, t0 + 0.65);
+  noiseGain.gain.linearRampToValueAtTime(0.0, t0 + 0.80);
+  noiseSrc.connect(bp1); bp1.connect(bp2); bp2.connect(noiseGain); noiseGain.connect(master);
+  noiseSrc.start(t0); noiseSrc.stop(t0 + 0.85);
+  function addEdgePartial(freq, gainPeak, decayTime) {
+    var osc = ctx.createOscillator(); osc.type = 'sine'; osc.frequency.value = freq;
+    var env = ctx.createGain();
+    env.gain.setValueAtTime(0.0, t0); env.gain.linearRampToValueAtTime(gainPeak, t0 + 0.30);
+    env.gain.setValueAtTime(gainPeak, t0 + 0.50); env.gain.exponentialRampToValueAtTime(0.0001, t0 + decayTime);
+    osc.connect(env); env.connect(master); osc.start(t0); osc.stop(t0 + decayTime + 1.5);
+  }
+  addEdgePartial(165, 0.07, 4.5); addEdgePartial(456, 0.04, 2.8); addEdgePartial(891, 0.02, 1.6);
 }
 
 // ─── Chugpi (죽비) Synthesizer ────────────────────────────────────
 
-function playChugpiNow(startTime) {
+// Shared persistent compressor for jugbi
+var chugpiMaster = null;
+function getChugpiMaster() {
   var ctx = getAudioContext();
-  var now = startTime;
+  if (!chugpiMaster) {
+    chugpiMaster = ctx.createDynamicsCompressor();
+    chugpiMaster.threshold.value = -10; chugpiMaster.knee.value = 8;
+    chugpiMaster.ratio.value = 2.5; chugpiMaster.attack.value = 0.001;
+    chugpiMaster.release.value = 0.15;
+    chugpiMaster.connect(ctx.destination);
+    var primeBuf = ctx.createBuffer(1, 2048, ctx.sampleRate);
+    var primeSrc = ctx.createBufferSource();
+    primeSrc.buffer = primeBuf; primeSrc.connect(chugpiMaster); primeSrc.start(0);
+  }
+  return chugpiMaster;
+}
 
-  var crackSize = Math.floor(ctx.sampleRate * 0.08);
-  var crackBuf  = ctx.createBuffer(1, crackSize, ctx.sampleRate);
-  var crackData = crackBuf.getChannelData(0);
-  for (var i = 0; i < crackSize; i++)
-    crackData[i] = (Math.random() * 2 - 1) * Math.pow(1 - i / crackSize, 4);
-  var crackSrc = ctx.createBufferSource();
-  crackSrc.buffer = crackBuf;
-  var crackFilter = ctx.createBiquadFilter();
-  crackFilter.type = 'bandpass';
-  crackFilter.frequency.value = 3500;
-  crackFilter.Q.value = 0.6;
-  var crackGain = ctx.createGain();
-  crackGain.gain.setValueAtTime(3.5, now);
-  crackGain.gain.exponentialRampToValueAtTime(0.001, now + 0.08);
-  crackSrc.connect(crackFilter);
-  crackFilter.connect(crackGain);
-  crackGain.connect(ctx.destination);
-  crackSrc.start(now);
-  crackSrc.stop(now + 0.09);
+function playChugpiNow(startTime, velocity) {
+  velocity = velocity !== undefined ? velocity : 1.0;
+  var ctx = getAudioContext(); var master = getChugpiMaster();
+  var now = startTime; var v = velocity;
+  var snapSize = Math.floor(ctx.sampleRate * 0.015);
+  var snapBuf = ctx.createBuffer(1, snapSize, ctx.sampleRate);
+  var snapData = snapBuf.getChannelData(0);
+  for (var i = 0; i < snapSize; i++)
+    snapData[i] = (Math.random() * 2 - 1) * Math.pow(1 - i / snapSize, 2.5);
+  var snapSrc = ctx.createBufferSource(); snapSrc.buffer = snapBuf;
+  var snapBpHi = ctx.createBiquadFilter();
+  snapBpHi.type = 'bandpass'; snapBpHi.frequency.value = 2400; snapBpHi.Q.value = 1.2;
+  var snapBpMid = ctx.createBiquadFilter();
+  snapBpMid.type = 'bandpass'; snapBpMid.frequency.value = 1400; snapBpMid.Q.value = 0.9;
+  var snapGainHi = ctx.createGain(); snapGainHi.gain.value = 0.6;
+  var snapGainMid = ctx.createGain(); snapGainMid.gain.value = 0.4;
+  var snapEnv = ctx.createGain();
+  snapEnv.gain.setValueAtTime(0.0, now);
+  snapEnv.gain.linearRampToValueAtTime(2.8 * v, now + 0.001);
+  snapEnv.gain.exponentialRampToValueAtTime(0.001, now + 0.016);
+  snapSrc.connect(snapBpHi); snapBpHi.connect(snapGainHi); snapGainHi.connect(snapEnv);
+  snapSrc.connect(snapBpMid); snapBpMid.connect(snapGainMid); snapGainMid.connect(snapEnv);
+  snapEnv.connect(master); snapSrc.start(now); snapSrc.stop(now + 0.018);
+  var flesSize = Math.floor(ctx.sampleRate * 0.08);
+  var flesBuf = ctx.createBuffer(1, flesSize, ctx.sampleRate);
+  var flesData = flesBuf.getChannelData(0);
+  for (var j = 0; j < flesSize; j++)
+    flesData[j] = (Math.random() * 2 - 1) * Math.pow(1 - j / flesSize, 1.6);
+  var flesSrc = ctx.createBufferSource(); flesSrc.buffer = flesBuf;
+  var flesBpLo = ctx.createBiquadFilter();
+  flesBpLo.type = 'bandpass'; flesBpLo.frequency.value = 500; flesBpLo.Q.value = 0.9;
+  var flesBpMid = ctx.createBiquadFilter();
+  flesBpMid.type = 'bandpass'; flesBpMid.frequency.value = 950; flesBpMid.Q.value = 0.8;
+  var flesBpHi = ctx.createBiquadFilter();
+  flesBpHi.type = 'bandpass'; flesBpHi.frequency.value = 1600; flesBpHi.Q.value = 1.0;
+  var flesGLo = ctx.createGain(); flesGLo.gain.value = 0.40;
+  var flesGMid = ctx.createGain(); flesGMid.gain.value = 0.40;
+  var flesGHi = ctx.createGain(); flesGHi.gain.value = 0.20;
+  var flesEnv = ctx.createGain();
+  flesEnv.gain.setValueAtTime(0.0, now);
+  flesEnv.gain.linearRampToValueAtTime(4.8 * v, now + 0.003);
+  flesEnv.gain.exponentialRampToValueAtTime(0.001, now + 0.085);
+  flesSrc.connect(flesBpLo); flesBpLo.connect(flesGLo); flesGLo.connect(flesEnv);
+  flesSrc.connect(flesBpMid); flesBpMid.connect(flesGMid); flesGMid.connect(flesEnv);
+  flesSrc.connect(flesBpHi); flesBpHi.connect(flesGHi); flesGHi.connect(flesEnv);
+  flesEnv.connect(master); flesSrc.start(now); flesSrc.stop(now + 0.09);
+  var palmOsc = ctx.createOscillator(); palmOsc.type = 'sine';
+  palmOsc.frequency.setValueAtTime(200, now);
+  palmOsc.frequency.exponentialRampToValueAtTime(140, now + 0.07);
+  var palmEnv = ctx.createGain();
+  palmEnv.gain.setValueAtTime(0.0, now);
+  palmEnv.gain.linearRampToValueAtTime(0.35 * v, now + 0.004);
+  palmEnv.gain.exponentialRampToValueAtTime(0.001, now + 0.07);
+  palmOsc.connect(palmEnv); palmEnv.connect(master);
+  palmOsc.start(now); palmOsc.stop(now + 0.09);
+  var thudSize = Math.floor(ctx.sampleRate * 0.055);
+  var thudBuf = ctx.createBuffer(1, thudSize, ctx.sampleRate);
+  var thudData = thudBuf.getChannelData(0);
+  for (var k = 0; k < thudSize; k++)
+    thudData[k] = (Math.random() * 2 - 1) * Math.pow(1 - k / thudSize, 2.5);
+  var thudSrc = ctx.createBufferSource(); thudSrc.buffer = thudBuf;
+  var thudLp = ctx.createBiquadFilter();
+  thudLp.type = 'lowpass'; thudLp.frequency.value = 280; thudLp.Q.value = 1.0;
+  var thudGain = ctx.createGain();
+  thudGain.gain.setValueAtTime(0.0, now);
+  thudGain.gain.linearRampToValueAtTime(2.2 * v, now + 0.004);
+  thudGain.gain.exponentialRampToValueAtTime(0.001, now + 0.055);
+  thudSrc.connect(thudLp); thudLp.connect(thudGain); thudGain.connect(master);
+  thudSrc.start(now); thudSrc.stop(now + 0.06);
+}
 
-  var resSize = Math.floor(ctx.sampleRate * 0.3);
-  var resBuf  = ctx.createBuffer(1, resSize, ctx.sampleRate);
-  var resData = resBuf.getChannelData(0);
-  for (var j = 0; j < resSize; j++)
-    resData[j] = (Math.random() * 2 - 1) * Math.pow(1 - j / resSize, 12);
-  var resSrc = ctx.createBufferSource();
-  resSrc.buffer = resBuf;
-  var resFilter = ctx.createBiquadFilter();
-  resFilter.type = 'bandpass';
-  resFilter.frequency.value = 900;
-  resFilter.Q.value = 1.2;
-  var resGain = ctx.createGain();
-  resGain.gain.setValueAtTime(2.0, now);
-  resGain.gain.exponentialRampToValueAtTime(0.001, now + 0.3);
-  resSrc.connect(resFilter);
-  resFilter.connect(resGain);
-  resGain.connect(ctx.destination);
-  resSrc.start(now);
-  resSrc.stop(now + 0.31);
+
+// ─── Ending sequences ────────────────────────────────────────────
+function playEndingSequence(type) {
+  if (type === 'none') return;
+  var ctx = getAudioContext();
+  function doPlay() {
+    var now = ctx.currentTime;
+    if (type === 'chugpi') {
+      getChugpiMaster();
+      playChugpiNow(now + 0.15, 1.0);
+      playChugpiNow(now + 1.65, 1.0);
+      playChugpiNow(now + 3.15, 1.0);
+    } else if (type === 'bell-high') {
+      playSingingBowlEdgeHigh(now + 0.0);
+      playTempleBellHigh(now + 1.8, 0.55);
+      playTempleBellHigh(now + 5.8, 1.0);
+      playTempleBellHigh(now + 9.8, 1.0);
+    } else {
+      playSingingBowlEdge(now + 0.0);
+      playTempleBell(now + 1.8, 0.55);
+      playTempleBell(now + 5.8, 1.0);
+      playTempleBell(now + 9.8, 1.0);
+    }
+  }
+  if (ctx.state === 'suspended') { ctx.resume().then(doPlay); } else { doPlay(); }
 }
 
 // ─── Unified play functions ───────────────────────────────────────
@@ -304,6 +548,13 @@ function playBell(timeSeconds) {
   timeSeconds = timeSeconds || 0;
   var ctx = getAudioContext();
   function doPlay() { playTempleBell(ctx.currentTime + timeSeconds); }
+  if (ctx.state === 'suspended') { ctx.resume().then(doPlay); } else { doPlay(); }
+}
+
+function playBellHigh(timeSeconds) {
+  timeSeconds = timeSeconds || 0;
+  var ctx = getAudioContext();
+  function doPlay() { playTempleBellHigh(ctx.currentTime + timeSeconds); }
   if (ctx.state === 'suspended') { ctx.resume().then(doPlay); } else { doPlay(); }
 }
 
@@ -318,6 +569,7 @@ function playSound(type, timeSeconds) {
   timeSeconds = timeSeconds || 0;
   if (type === 'none') return;
   if (type === 'chugpi') playChugpi(timeSeconds);
+  else if (type === 'bell-high') playBellHigh(timeSeconds);
   else playBell(timeSeconds);
 }
 
@@ -325,7 +577,18 @@ function playStrokes(type, count, startDelay) {
   startDelay = startDelay || 0;
   if (type === 'none') return;
   var interval = type === 'chugpi' ? 1.5 : 1.4;
-  for (var i = 0; i < count; i++) playSound(type, startDelay + i * interval);
+  if (type === 'chugpi') {
+    var ctx = getAudioContext(); getChugpiMaster();
+    var leadIn = 0.15;
+    for (var i = 0; i < count; i++) {
+      (function(delay) {
+        function doPlay() { playChugpiNow(ctx.currentTime + delay, 1.0); }
+        if (ctx.state === 'suspended') { ctx.resume().then(doPlay); } else { doPlay(); }
+      })(leadIn + startDelay + i * interval);
+    }
+  } else {
+    for (var i = 0; i < count; i++) playSound(type, startDelay + i * interval);
+  }
 }
 
 // ─── Meditation UI state ──────────────────────────────────────────
@@ -486,8 +749,8 @@ function tick() {
     setMeditating(false);
     if (noSleep) noSleep.disable();
     stopSilentLoop();
-    playStrokes(currentSound, 3);
-    saveSession(true);
+    playEndingSequence(currentSound);
+    showNoteField(true, undefined);
     statusEl.textContent = t('status_complete');
     btnStart.disabled    = false;
     btnStop.disabled     = true;
@@ -515,7 +778,7 @@ function stopSession() {
   if (noSleep) noSleep.disable();
   stopSilentLoop();
   var actual = Math.round((Date.now() - sessionStart) / 1000);
-  saveSession(false, actual);
+  showNoteField(false, actual);
   statusEl.textContent = t('status_stopped');
   btnStart.disabled    = false;
   btnStop.disabled     = true;
@@ -530,19 +793,54 @@ function getSessions() {
   catch(e) { return []; }
 }
 
-function saveSession(completed, actualSecs) {
+function saveSession(completed, actualSecs, note) {   // ← add note param
   var sessions = getSessions();
   sessions.unshift({
     id:        Date.now(),
-    date:      new Date(sessionStart).toLocaleDateString(currentLang === 'pl' ? 'pl-PL' : 'en-GB'),
+    date:      new Date(sessionStart).toLocaleDateString({ pl: 'pl-PL', ko: 'ko-KR', en: 'en-GB' }[currentLang] || 'en-GB'),
     startTime: new Date(sessionStart).toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' }),
     planned:   plannedDuration,
     actual:    actualSecs !== undefined ? actualSecs : plannedDuration,
     completed: completed,
-    sound:     currentSound
+    sound:     currentSound,
+    note:      note || ''                              // ← store it
   });
   localStorage.setItem('meditation_log', JSON.stringify(sessions));
 }
+
+// ─── Session Note ─────────────────────────────────────────────────
+function showNoteField(completed, actualSecs) {
+  var wrap  = document.getElementById('note-wrap');
+  var input = document.getElementById('note-input');
+  var btn   = document.getElementById('note-save-btn');
+  if (!wrap) { saveSession(completed, actualSecs, ''); return; }
+
+  var saved = false;
+
+  input.value        = '';
+  input.placeholder  = t('note_placeholder');
+  btn.textContent    = t('note_save');
+  wrap.style.display = 'flex';
+  input.focus();
+
+  function doSave() {
+    if (saved) return;
+    saved = true;
+    wrap.style.display = 'none';
+    saveSession(completed, actualSecs, input.value.trim());
+  }
+
+  btn.onclick     = doSave;
+  input.onkeydown = function(e) { if (e.key === 'Enter') doSave(); };
+
+  // Auto-save if user navigates away, switches tab, or just ignores the field
+  input.onblur    = function() { setTimeout(doSave, 200); };
+  document.querySelectorAll('.nav-btn').forEach(function(b) {
+    b.addEventListener('click', doSave, { once: true });
+  });
+}
+
+
 
 function formatDuration(secs) {
   var m = Math.floor(secs / 60);
@@ -550,30 +848,127 @@ function formatDuration(secs) {
   return s > 0 ? (m + 'm ' + s + 's') : (m + 'm');
 }
 
+// ─── Streak ───────────────────────────────────────────────────────
+function computeStreak(sessions) {
+  var dateSet = {};
+  sessions.forEach(function(s) {
+    if (!s.completed) return;
+    var d = new Date(s.id);
+    var k = d.getFullYear() + '-' +
+            String(d.getMonth() + 1).padStart(2, '0') + '-' +
+            String(d.getDate()).padStart(2, '0');
+    dateSet[k] = true;
+  });
+  var streak = 0;
+  for (var i = 0; i < 365; i++) {
+    var d = new Date();
+    d.setDate(d.getDate() - i);
+    var k = d.getFullYear() + '-' +
+            String(d.getMonth() + 1).padStart(2, '0') + '-' +
+            String(d.getDate()).padStart(2, '0');
+    if (dateSet[k]) { streak++; } else { break; }
+  }
+  return streak;
+}
+
+// ─── Weekly Chart ─────────────────────────────────────────────────
+function buildWeekChart(sessions) {
+  var W = 7, BW = 28, GAP = 8, H = 56, LH = 18;
+  var svgW = W * (BW + GAP) - GAP;
+  var cs = getComputedStyle(document.documentElement);
+  var accent  = cs.getPropertyValue('--accent').trim()  || '#88c0d0';
+  var muted   = cs.getPropertyValue('--muted').trim()   || '#7b8fa1';
+  var border  = cs.getPropertyValue('--border').trim()  || '#2e3a4e';
+
+  var dayMins = {}, days = [];
+  for (var i = W - 1; i >= 0; i--) {
+    var d = new Date();
+    d.setDate(d.getDate() - i);
+    var k = d.getFullYear() + '-' +
+            String(d.getMonth() + 1).padStart(2, '0') + '-' +
+            String(d.getDate()).padStart(2, '0');
+    var label = d.toLocaleDateString(
+      { pl: 'pl-PL', ko: 'ko-KR', en: 'en-GB' }[currentLang] || 'en-GB',
+      { weekday: 'narrow' }
+    );
+    days.push({ key: k, label: label });
+    dayMins[k] = 0;
+  }
+
+  sessions.forEach(function(s) {
+    var d = new Date(s.id);
+    var k = d.getFullYear() + '-' +
+            String(d.getMonth() + 1).padStart(2, '0') + '-' +
+            String(d.getDate()).padStart(2, '0');
+    if (dayMins[k] !== undefined) dayMins[k] += Math.round(s.actual / 60);
+  });
+
+  var maxM = Math.max(1, Math.max.apply(null, days.map(function(d) { return dayMins[d.key]; })));
+  var todayKey = days[W - 1].key;
+
+  var bars = days.map(function(day, i) {
+    var mins = dayMins[day.key];
+    var bh   = mins > 0 ? Math.max(4, Math.round((mins / maxM) * H)) : 2;
+    var x    = i * (BW + GAP);
+    var fill = mins > 0 ? accent : border;
+    var op   = day.key === todayKey ? '1' : '0.65';
+    return '<rect x="' + x + '" y="' + (H - bh) + '" width="' + BW + '" height="' + bh +
+           '" rx="3" fill="' + fill + '" opacity="' + op + '">' +
+           '<title>' + mins + ' min</title></rect>' +
+           '<text x="' + (x + BW / 2) + '" y="' + (H + LH - 2) +
+           '" text-anchor="middle" font-size="10" fill="' + muted + '">' + day.label + '</text>';
+  }).join('');
+
+  return '<svg width="100%" viewBox="0 0 ' + svgW + ' ' + (H + LH) +
+         '" style="display:block;margin:14px 0 6px">' + bars + '</svg>';
+}
+
 function renderLog() {
   var sessions  = getSessions();
   var totalSecs = sessions.reduce(function(a, s) { return a + s.actual; }, 0);
   var totalH    = Math.floor(totalSecs / 3600);
   var totalM    = Math.floor((totalSecs % 3600) / 60);
+
+  var streak = computeStreak(sessions);
+  var streakHtml = streak > 0
+    ? ' &nbsp;🔥 <strong>' + streak + '</strong> ' + t('log_days')
+    : '';
+
   document.getElementById('log-summary').innerHTML =
-    t('log_sessions') + ': <strong>' + sessions.length + '</strong> &nbsp; ' +
-    t('log_total') + ': <strong>' + totalH + 'h ' + totalM + 'm</strong> &nbsp; ' +
-    t('log_completed') + ': <strong>' + sessions.filter(function(s) { return s.completed; }).length + '</strong>';
+    t('log_sessions') + ': <strong>' + sessions.length + '</strong> &nbsp;' +
+    t('log_total') + ': <strong>' + totalH + 'h ' + totalM + 'm</strong> &nbsp;' +
+    t('log_completed') + ': <strong>' + sessions.filter(function(s) { return s.completed; }).length + '</strong>' +
+    streakHtml;
+
+  var chartEl = document.getElementById('log-chart');
+  if (chartEl) chartEl.innerHTML = sessions.length ? buildWeekChart(sessions) : '';
+
   document.getElementById('log-list').innerHTML = sessions.map(function(s) {
+    var noteHtml = s.note
+      ? '<div class="log-note">' + s.note.replace(/</g, '&lt;') + '</div>'
+      : '';
     return '<li>' +
       '<div class="log-date">' + s.date + ' &nbsp; ' + s.startTime + '</div>' +
       '<div class="log-detail">' +
         formatDuration(s.actual) + ' / ' + formatDuration(s.planned) + ' ' + t('log_planned') +
         (!s.completed ? ' &nbsp; ' + t('log_stopped') : '') +
-      '</div></li>';
+      '</div>' + noteHtml + '</li>';
   }).join('');
 }
 
 document.getElementById('btn-export').addEventListener('click', function() {
   var sessions = getSessions();
-  var rows = [['Date', 'Start', 'Planned (s)', 'Actual (s)', 'Completed', 'Sound']].concat(
+  var rows = [['Date', 'Start', 'Planned (s)', 'Actual (s)', 'Completed', 'Sound', 'Note']].concat(
     sessions.map(function(s) {
-      return [s.date, s.startTime, s.planned, s.actual, s.completed, s.sound];
+      return [
+        s.date,
+        s.startTime,
+        s.planned,
+        s.actual,
+        s.completed,
+        s.sound,
+        '"' + (s.note || '').replace(/"/g, '""') + '"'
+      ];
     })
   );
   var csv = rows.map(function(r) { return r.join(','); }).join('\n');
@@ -582,6 +977,7 @@ document.getElementById('btn-export').addEventListener('click', function() {
   a.download = 'meditation_log.csv';
   a.click();
 });
+
 
 document.getElementById('btn-clear-log').addEventListener('click', function() {
   if (confirm(t('confirm_clear'))) {
@@ -625,6 +1021,28 @@ document.getElementById('btn-save-settings').addEventListener('click', function(
   settingsSaved.style.display = 'inline';
   setTimeout(function() { settingsSaved.style.display = 'none'; }, 2000);
 });
+
+
+// ─── iOS Install Banner ───────────────────────────────────────────
+(function() {
+  var isIos = /iphone|ipad|ipod/i.test(navigator.userAgent);
+  var isStandalone = window.navigator.standalone === true;
+  var dismissed = localStorage.getItem('iosPromptDismissed');
+  if (!isIos || isStandalone || dismissed) return;
+
+  var banner = document.getElementById('ios-install-banner');
+  var text   = document.getElementById('ios-install-text');
+  var close  = document.getElementById('ios-install-close');
+  if (!banner) return;
+
+  text.textContent = t('ios_install');
+  banner.style.display = 'flex';
+
+  close.addEventListener('click', function() {
+    banner.style.display = 'none';
+    localStorage.setItem('iosPromptDismissed', '1');
+  });
+})();
 
 // ─── Init ────────────────────────────────────────────────────────
 

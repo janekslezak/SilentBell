@@ -343,3 +343,48 @@ footer a {
   text-underline-offset: 3px;
 }
 
+/* ── iOS Install Banner ── */
+#ios-install-banner {
+  position: fixed;
+  bottom: 20px;
+  left: 50%;
+  transform: translateX(-50%);
+  width: calc(100% - 40px);
+  max-width: 440px;
+  background: var(--surface);
+  border: 1px solid var(--accent);
+  border-radius: var(--radius);
+  padding: 14px 16px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  font-size: 0.88rem;
+  color: var(--text);
+  z-index: 100;
+  box-shadow: 0 4px 24px rgba(0,0,0,0.35);
+  animation: banner-slide-up 0.4s ease;
+}
+@keyframes banner-slide-up {
+  from { opacity: 0; transform: translateX(-50%) translateY(20px); }
+  to   { opacity: 1; transform: translateX(-50%) translateY(0); }
+}
+#ios-install-text { flex: 1; line-height: 1.5; }
+#ios-install-close {
+  background: none;
+  border: none;
+  color: var(--muted);
+  font-size: 1rem;
+  cursor: pointer;
+  padding: 4px 6px;
+  flex-shrink: 0;
+}
+
+.log-note {
+  color: var(--accent);
+  font-size: 0.82rem;
+  font-style: italic;
+  margin-top: 3px;
+}
+
+
