@@ -395,3 +395,31 @@ footer a {
   flex-shrink: 0;
 }
 
+.sound-row {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
+
+.sound-row select {
+  flex: 1;
+}
+
+#btn-test-sound {
+  flex-shrink: 0;
+  padding: 13px 18px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  color: var(--accent);
+  font-size: 1rem;
+  cursor: pointer;
+  touch-action: manipulation;
+  -webkit-tap-highlight-color: transparent;
+  transition: border-color 0.15s, color 0.15s;
+}
+
+#btn-test-sound:hover {
+  border-color: var(--accent);
+}
+

@@ -884,6 +884,16 @@ function formatDuration(secs) {
   return s > 0 ? (m + 'm ' + s + 's') : (m + 'm');
 }
 
+// ─── Test Sound ───────────────────────────────────────────────────
+
+document.getElementById('btn-test-sound').addEventListener('click', function() {
+  unlockAudio();
+  var type = document.getElementById('settings-sound').value;
+  if (type === 'chugpi') playStrokes('chugpi', 1);
+  else if (type !== 'none') playSound(type);
+});
+
+
 // ─── Streak ───────────────────────────────────────────────────────
 
 function computeStreak(sessions) {
@@ -1125,7 +1135,6 @@ document.getElementById('btn-clear-log').addEventListener('click', function() {
 var settingsDuration = document.getElementById('settings-duration');
 var settingsSound    = document.getElementById('settings-sound');
 var settingsPrepare  = document.getElementById('settings-prepare');
-var settingsSaved    = document.getElementById('settings-saved');
 
 function loadSettings() {
   var dur      = localStorage.getItem('settings_duration');
@@ -1147,29 +1156,42 @@ function loadSettings() {
   if (settingsPrepare) settingsPrepare.value = p;
 }
 
-document.getElementById('btn-save-settings').addEventListener('click', function() {
-  var dur      = parseInt(settingsDuration.value);
-  var sound    = settingsSound.value;
-  var prep     = parseInt(settingsPrepare.value);
-  var interval = intervalSelect.value;
+settingsSound.addEventListener('change', function() {
+  currentSound = settingsSound.value;
+  localStorage.setItem('settings_sound', currentSound);
+});
 
+intervalSelect.addEventListener('change', function() {
+  localStorage.setItem('settings_interval', intervalSelect.value);
+});
+
+settingsDuration.addEventListener('change', function() {
+  var dur = parseInt(settingsDuration.value);
   if (dur > 0) {
     localStorage.setItem('settings_duration', dur);
     selectedMinutes     = dur;
     selectedSeconds     = 0;
     display.textContent = formatTime(dur * 60);
   }
-  currentSound = sound;
-  localStorage.setItem('settings_sound', sound);
-  localStorage.setItem('settings_interval', interval);
+});
 
+settingsPrepare.addEventListener('change', function() {
+  var prep = parseInt(settingsPrepare.value);
   if (!isNaN(prep) && prep >= 0) {
     prepareSeconds = prep;
     localStorage.setItem('settings_prepare', prep);
   }
-  settingsSaved.style.display = 'inline';
-  setTimeout(function() { settingsSaved.style.display = 'none'; }, 2000);
 });
+
+// ─── Test Sound ───────────────────────────────────────────────────
+
+document.getElementById('btn-test-sound').addEventListener('click', function() {
+  unlockAudio();
+  var type = settingsSound.value;
+  if (type === 'chugpi') playStrokes('chugpi', 1);
+  else if (type !== 'none') playSound(type);
+});
+
 
 // ─── iOS Install Banner ───────────────────────────────────────────
 
