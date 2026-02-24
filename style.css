@@ -193,6 +193,31 @@ select {
   transition: background 0.3s, color 0.3s, border-color 0.3s;
 }
 
+/* ── Sound row ── */
+.sound-row {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
+
+.sound-row select { flex: 1; }
+
+#btn-test-sound {
+  flex-shrink: 0;
+  padding: 13px 18px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  color: var(--accent);
+  font-size: 1rem;
+  cursor: pointer;
+  touch-action: manipulation;
+  -webkit-tap-highlight-color: transparent;
+  transition: border-color 0.15s, color 0.15s;
+}
+
+#btn-test-sound:hover { border-color: var(--accent); }
+
 /* ── Lotus figure — hidden by default ── */
 .lotus-figure {
   display: none;
@@ -277,8 +302,7 @@ h2 { font-size: 1.1rem; font-weight: 400; color: var(--accent); }
 /* ── Secondary buttons ── */
 #btn-export,
 #btn-import-csv,
-#btn-clear-log,
-#btn-save-settings {
+#btn-clear-log {
   padding: 14px;
   border: 1px solid var(--border);
   border-radius: var(--radius);
@@ -292,8 +316,7 @@ h2 { font-size: 1.1rem; font-weight: 400; color: var(--accent); }
   transition: background 0.3s, color 0.3s;
 }
 
-#btn-clear-log  { color: var(--danger); border-color: var(--danger); }
-#settings-saved { color: var(--saved-color); }
+#btn-clear-log { color: var(--danger); border-color: var(--danger); }
 
 /* ── Meditation active state ── */
 #view-timer.meditating {
@@ -302,14 +325,20 @@ h2 { font-size: 1.1rem; font-weight: 400; color: var(--accent); }
   min-height: calc(100vh - 120px);
   gap: 16px;
   padding-top: 32px;
+  flex-direction: column;
 }
+
+/* Reorder elements during session */
+#view-timer.meditating .lotus-figure { order: 1; display: flex; }
+#view-timer.meditating #display-wrap { order: 2; margin: 0; }
+#view-timer.meditating #status       { order: 3; }
+#view-timer.meditating .controls     { order: 4; }
+#view-timer.meditating #note-wrap    { order: 5; }
 
 /* Hide arrows during session */
 #view-timer.meditating #display-arrows { display: none; }
 
-/* Show lotus */
-#view-timer.meditating .lotus-figure { display: flex; }
-
+/* Lotus pulse animation */
 #view-timer.meditating .lotus-svg {
   animation: lotus-pulse 4s ease-in-out infinite;
 }
@@ -319,7 +348,7 @@ h2 { font-size: 1.1rem; font-weight: 400; color: var(--accent); }
   50%       { opacity: 0.35; transform: scale(0.96); }
 }
 
-/* Restyle controls row during session */
+/* Controls during session */
 #view-timer.meditating .controls {
   flex-direction: column;
   align-items: center;
@@ -393,33 +422,5 @@ footer a {
   cursor: pointer;
   padding: 4px 6px;
   flex-shrink: 0;
-}
-
-.sound-row {
-  display: flex;
-  gap: 8px;
-  align-items: center;
-}
-
-.sound-row select {
-  flex: 1;
-}
-
-#btn-test-sound {
-  flex-shrink: 0;
-  padding: 13px 18px;
-  background: var(--surface);
-  border: 1px solid var(--border);
-  border-radius: var(--radius);
-  color: var(--accent);
-  font-size: 1rem;
-  cursor: pointer;
-  touch-action: manipulation;
-  -webkit-tap-highlight-color: transparent;
-  transition: border-color 0.15s, color 0.15s;
-}
-
-#btn-test-sound:hover {
-  border-color: var(--accent);
 }
 
