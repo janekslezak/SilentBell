@@ -24,10 +24,9 @@ const STRINGS = {
     btn_clear:         'Clear Log',
     btn_save:          'Save',
     settings_duration: 'Default duration (min)',
-    settings_sound:    'Default sound',
+    settings_sound:    'Sound',
     settings_prepare:  'Prepare countdown (sec)',
     settings_saved:    'Saved ✓',
-    custom_placeholder:'Custom time',
     log_sessions:      'Sessions',
     log_total:         'Total time',
     log_completed:     'Completed',
@@ -63,10 +62,9 @@ const STRINGS = {
     btn_clear:         'Wyczyść',
     btn_save:          'Zapisz',
     settings_duration: 'Domyślny czas (min)',
-    settings_sound:    'Domyślny dźwięk',
+    settings_sound:    'Dźwięk',
     settings_prepare:  'Odliczanie przed startem (s)',
     settings_saved:    'Zapisano ✓',
-    custom_placeholder:'Własny czas',
     log_sessions:      'Sesje',
     log_total:         'Łączny czas',
     log_completed:     'Ukończone',
@@ -78,8 +76,7 @@ const STRINGS = {
     log_days:          'dni',
     note_placeholder:  'Notatka (opcjonalna)',
     note_save:         'Zapisz ✓'
-}
-  ,
+  },
   ko: {
     app_title:         '침묵의 종',
     nav_timer:         '타이머',
@@ -103,10 +100,9 @@ const STRINGS = {
     btn_clear:         '기록 삭제',
     btn_save:          '저장',
     settings_duration: '기본 시간 (분)',
-    settings_sound:    '기본 소리',
+    settings_sound:    '소리',
     settings_prepare:  '준비 카운트다운 (초)',
     settings_saved:    '저장됨 ✓',
-    custom_placeholder:'직접 입력 (분)',
     log_sessions:      '세션',
     log_total:         '총 시간',
     log_completed:     '완료',
@@ -138,13 +134,13 @@ function applyLang() {
   document.querySelectorAll('[data-i18n-placeholder]').forEach(function(el) {
     el.placeholder = t(el.dataset.i18nPlaceholder);
   });
-  var allLangs = ['en', 'pl', 'ko'];
-  var otherLangs = allLangs.filter(function(l) { return l !== currentLang; });
+  var allLangs    = ['en', 'pl', 'ko'];
+  var otherLangs  = allLangs.filter(function(l) { return l !== currentLang; });
   var langDisplay = { en: 'EN', pl: 'PL', ko: '한' };
   var btns = document.querySelectorAll('.btn-lang');
   btns.forEach(function(btn, i) {
     btn.dataset.lang = otherLangs[i];
-    btn.textContent = langDisplay[otherLangs[i]];
+    btn.textContent  = langDisplay[otherLangs[i]];
   });
   var logView = document.getElementById('view-log');
   if (logView && logView.classList.contains('active')) renderLog();
@@ -173,9 +169,9 @@ document.getElementById('btn-theme').addEventListener('click', function() {
 
 // ─── Audio Engine ────────────────────────────────────────────────
 
-var noSleep      = null;
-var audioCtx     = null;
-var silentLoop   = null;
+var noSleep    = null;
+var audioCtx   = null;
+var silentLoop = null;
 
 function getAudioContext() {
   if (!audioCtx) {
@@ -211,7 +207,6 @@ function startSilentLoop() {
   }
   silentLoop.play().catch(function(e) { console.warn('Silent loop:', e); });
 }
-
 
 function stopSilentLoop() {
   if (silentLoop) {
@@ -281,7 +276,7 @@ function playTempleBell(startTime, velocity) {
   var shimmerLfo = ctx.createOscillator();
   shimmerLfo.type = 'sine'; shimmerLfo.frequency.value = 4.5;
   var shimmerDepth = ctx.createGain(); shimmerDepth.gain.value = 0.02;
-  var shimmerFund = ctx.createOscillator();
+  var shimmerFund  = ctx.createOscillator();
   shimmerFund.type = 'sine'; shimmerFund.frequency.value = 110;
   var shimmerEnv = ctx.createGain();
   shimmerEnv.gain.setValueAtTime(0.0, t0);
@@ -293,7 +288,8 @@ function playTempleBell(startTime, velocity) {
   shimmerLfo.stop(t0 + 16.0); shimmerFund.stop(t0 + 16.0);
 }
 
-// ─── Temple Bell — Higher Pitch (partials ~1.5x, perfect fifth up) ─
+// ─── Temple Bell — Higher Pitch ───────────────────────────────────
+
 function playTempleBellHigh(startTime, velocity) {
   velocity = velocity !== undefined ? velocity : 1.0;
   var ctx = getAudioContext();
@@ -341,7 +337,7 @@ function playTempleBellHigh(startTime, velocity) {
   var shimmerLfo = ctx.createOscillator();
   shimmerLfo.type = 'sine'; shimmerLfo.frequency.value = 5.5;
   var shimmerDepth = ctx.createGain(); shimmerDepth.gain.value = 0.02;
-  var shimmerFund = ctx.createOscillator();
+  var shimmerFund  = ctx.createOscillator();
   shimmerFund.type = 'sine'; shimmerFund.frequency.value = 165;
   var shimmerEnv = ctx.createGain();
   shimmerEnv.gain.setValueAtTime(0.0, t0);
@@ -353,8 +349,8 @@ function playTempleBellHigh(startTime, velocity) {
   shimmerLfo.stop(t0 + 13.0); shimmerFund.stop(t0 + 13.0);
 }
 
-
 // ─── Singing Bowl Edge (standard pitch) ──────────────────────────
+
 function playSingingBowlEdge(startTime) {
   var ctx = getAudioContext(); var t0 = startTime;
   var master = ctx.createDynamicsCompressor();
@@ -364,7 +360,7 @@ function playSingingBowlEdge(startTime) {
   lpf.type = 'lowpass'; lpf.frequency.value = 5000; lpf.Q.value = 0.5;
   master.connect(lpf); lpf.connect(ctx.destination);
   var noiseSize = Math.floor(ctx.sampleRate * 0.8);
-  var noiseBuf = ctx.createBuffer(1, noiseSize, ctx.sampleRate);
+  var noiseBuf  = ctx.createBuffer(1, noiseSize, ctx.sampleRate);
   var noiseData = noiseBuf.getChannelData(0);
   for (var i = 0; i < noiseSize; i++) {
     var hann = 0.5 * (1 - Math.cos(2 * Math.PI * i / (noiseSize - 1)));
@@ -377,7 +373,7 @@ function playSingingBowlEdge(startTime) {
   noiseGain.gain.setValueAtTime(0.0, t0);
   noiseGain.gain.linearRampToValueAtTime(0.15, t0 + 0.5);
   noiseGain.gain.linearRampToValueAtTime(0.12, t0 + 0.7);
-  noiseGain.gain.linearRampToValueAtTime(0.0, t0 + 0.85);
+  noiseGain.gain.linearRampToValueAtTime(0.0,  t0 + 0.85);
   noiseSrc.connect(bp1); bp1.connect(bp2); bp2.connect(noiseGain); noiseGain.connect(master);
   noiseSrc.start(t0); noiseSrc.stop(t0 + 0.9);
   function addEdgePartial(freq, gainPeak, decayTime) {
@@ -391,6 +387,7 @@ function playSingingBowlEdge(startTime) {
 }
 
 // ─── Singing Bowl Edge (higher pitch) ────────────────────────────
+
 function playSingingBowlEdgeHigh(startTime) {
   var ctx = getAudioContext(); var t0 = startTime;
   var master = ctx.createDynamicsCompressor();
@@ -400,7 +397,7 @@ function playSingingBowlEdgeHigh(startTime) {
   lpf.type = 'lowpass'; lpf.frequency.value = 6000; lpf.Q.value = 0.5;
   master.connect(lpf); lpf.connect(ctx.destination);
   var noiseSize = Math.floor(ctx.sampleRate * 0.8);
-  var noiseBuf = ctx.createBuffer(1, noiseSize, ctx.sampleRate);
+  var noiseBuf  = ctx.createBuffer(1, noiseSize, ctx.sampleRate);
   var noiseData = noiseBuf.getChannelData(0);
   for (var i = 0; i < noiseSize; i++) {
     var hann = 0.5 * (1 - Math.cos(2 * Math.PI * i / (noiseSize - 1)));
@@ -413,7 +410,7 @@ function playSingingBowlEdgeHigh(startTime) {
   noiseGain.gain.setValueAtTime(0.0, t0);
   noiseGain.gain.linearRampToValueAtTime(0.15, t0 + 0.45);
   noiseGain.gain.linearRampToValueAtTime(0.12, t0 + 0.65);
-  noiseGain.gain.linearRampToValueAtTime(0.0, t0 + 0.80);
+  noiseGain.gain.linearRampToValueAtTime(0.0,  t0 + 0.80);
   noiseSrc.connect(bp1); bp1.connect(bp2); bp2.connect(noiseGain); noiseGain.connect(master);
   noiseSrc.start(t0); noiseSrc.stop(t0 + 0.85);
   function addEdgePartial(freq, gainPeak, decayTime) {
@@ -428,7 +425,6 @@ function playSingingBowlEdgeHigh(startTime) {
 
 // ─── Chugpi (죽비) Synthesizer ────────────────────────────────────
 
-// Shared persistent compressor for jugbi
 var chugpiMaster = null;
 function getChugpiMaster() {
   var ctx = getAudioContext();
@@ -450,46 +446,46 @@ function playChugpiNow(startTime, velocity) {
   var ctx = getAudioContext(); var master = getChugpiMaster();
   var now = startTime; var v = velocity;
   var snapSize = Math.floor(ctx.sampleRate * 0.015);
-  var snapBuf = ctx.createBuffer(1, snapSize, ctx.sampleRate);
+  var snapBuf  = ctx.createBuffer(1, snapSize, ctx.sampleRate);
   var snapData = snapBuf.getChannelData(0);
   for (var i = 0; i < snapSize; i++)
     snapData[i] = (Math.random() * 2 - 1) * Math.pow(1 - i / snapSize, 2.5);
-  var snapSrc = ctx.createBufferSource(); snapSrc.buffer = snapBuf;
+  var snapSrc  = ctx.createBufferSource(); snapSrc.buffer = snapBuf;
   var snapBpHi = ctx.createBiquadFilter();
   snapBpHi.type = 'bandpass'; snapBpHi.frequency.value = 2400; snapBpHi.Q.value = 1.2;
   var snapBpMid = ctx.createBiquadFilter();
   snapBpMid.type = 'bandpass'; snapBpMid.frequency.value = 1400; snapBpMid.Q.value = 0.9;
-  var snapGainHi = ctx.createGain(); snapGainHi.gain.value = 0.6;
+  var snapGainHi  = ctx.createGain(); snapGainHi.gain.value  = 0.6;
   var snapGainMid = ctx.createGain(); snapGainMid.gain.value = 0.4;
   var snapEnv = ctx.createGain();
   snapEnv.gain.setValueAtTime(0.0, now);
   snapEnv.gain.linearRampToValueAtTime(2.8 * v, now + 0.001);
   snapEnv.gain.exponentialRampToValueAtTime(0.001, now + 0.016);
-  snapSrc.connect(snapBpHi); snapBpHi.connect(snapGainHi); snapGainHi.connect(snapEnv);
+  snapSrc.connect(snapBpHi);  snapBpHi.connect(snapGainHi);   snapGainHi.connect(snapEnv);
   snapSrc.connect(snapBpMid); snapBpMid.connect(snapGainMid); snapGainMid.connect(snapEnv);
   snapEnv.connect(master); snapSrc.start(now); snapSrc.stop(now + 0.018);
   var flesSize = Math.floor(ctx.sampleRate * 0.08);
-  var flesBuf = ctx.createBuffer(1, flesSize, ctx.sampleRate);
+  var flesBuf  = ctx.createBuffer(1, flesSize, ctx.sampleRate);
   var flesData = flesBuf.getChannelData(0);
   for (var j = 0; j < flesSize; j++)
     flesData[j] = (Math.random() * 2 - 1) * Math.pow(1 - j / flesSize, 1.6);
-  var flesSrc = ctx.createBufferSource(); flesSrc.buffer = flesBuf;
+  var flesSrc  = ctx.createBufferSource(); flesSrc.buffer = flesBuf;
   var flesBpLo = ctx.createBiquadFilter();
-  flesBpLo.type = 'bandpass'; flesBpLo.frequency.value = 500; flesBpLo.Q.value = 0.9;
+  flesBpLo.type = 'bandpass'; flesBpLo.frequency.value = 500;  flesBpLo.Q.value = 0.9;
   var flesBpMid = ctx.createBiquadFilter();
   flesBpMid.type = 'bandpass'; flesBpMid.frequency.value = 950; flesBpMid.Q.value = 0.8;
   var flesBpHi = ctx.createBiquadFilter();
   flesBpHi.type = 'bandpass'; flesBpHi.frequency.value = 1600; flesBpHi.Q.value = 1.0;
-  var flesGLo = ctx.createGain(); flesGLo.gain.value = 0.40;
+  var flesGLo  = ctx.createGain(); flesGLo.gain.value  = 0.40;
   var flesGMid = ctx.createGain(); flesGMid.gain.value = 0.40;
-  var flesGHi = ctx.createGain(); flesGHi.gain.value = 0.20;
-  var flesEnv = ctx.createGain();
+  var flesGHi  = ctx.createGain(); flesGHi.gain.value  = 0.20;
+  var flesEnv  = ctx.createGain();
   flesEnv.gain.setValueAtTime(0.0, now);
   flesEnv.gain.linearRampToValueAtTime(4.8 * v, now + 0.003);
   flesEnv.gain.exponentialRampToValueAtTime(0.001, now + 0.085);
-  flesSrc.connect(flesBpLo); flesBpLo.connect(flesGLo); flesGLo.connect(flesEnv);
+  flesSrc.connect(flesBpLo);  flesBpLo.connect(flesGLo);   flesGLo.connect(flesEnv);
   flesSrc.connect(flesBpMid); flesBpMid.connect(flesGMid); flesGMid.connect(flesEnv);
-  flesSrc.connect(flesBpHi); flesBpHi.connect(flesGHi); flesGHi.connect(flesEnv);
+  flesSrc.connect(flesBpHi);  flesBpHi.connect(flesGHi);   flesGHi.connect(flesEnv);
   flesEnv.connect(master); flesSrc.start(now); flesSrc.stop(now + 0.09);
   var palmOsc = ctx.createOscillator(); palmOsc.type = 'sine';
   palmOsc.frequency.setValueAtTime(200, now);
@@ -501,12 +497,12 @@ function playChugpiNow(startTime, velocity) {
   palmOsc.connect(palmEnv); palmEnv.connect(master);
   palmOsc.start(now); palmOsc.stop(now + 0.09);
   var thudSize = Math.floor(ctx.sampleRate * 0.055);
-  var thudBuf = ctx.createBuffer(1, thudSize, ctx.sampleRate);
+  var thudBuf  = ctx.createBuffer(1, thudSize, ctx.sampleRate);
   var thudData = thudBuf.getChannelData(0);
   for (var k = 0; k < thudSize; k++)
     thudData[k] = (Math.random() * 2 - 1) * Math.pow(1 - k / thudSize, 2.5);
   var thudSrc = ctx.createBufferSource(); thudSrc.buffer = thudBuf;
-  var thudLp = ctx.createBiquadFilter();
+  var thudLp  = ctx.createBiquadFilter();
   thudLp.type = 'lowpass'; thudLp.frequency.value = 280; thudLp.Q.value = 1.0;
   var thudGain = ctx.createGain();
   thudGain.gain.setValueAtTime(0.0, now);
@@ -514,33 +510,6 @@ function playChugpiNow(startTime, velocity) {
   thudGain.gain.exponentialRampToValueAtTime(0.001, now + 0.055);
   thudSrc.connect(thudLp); thudLp.connect(thudGain); thudGain.connect(master);
   thudSrc.start(now); thudSrc.stop(now + 0.06);
-}
-
-
-// ─── Ending sequences ────────────────────────────────────────────
-function playEndingSequence(type) {
-  if (type === 'none') return;
-  var ctx = getAudioContext();
-  function doPlay() {
-    var now = ctx.currentTime;
-    if (type === 'chugpi') {
-      getChugpiMaster();
-      playChugpiNow(now + 0.15, 1.0);
-      playChugpiNow(now + 1.65, 1.0);
-      playChugpiNow(now + 3.15, 1.0);
-    } else if (type === 'bell-high') {
-      playSingingBowlEdgeHigh(now + 0.0);
-      playTempleBellHigh(now + 1.8, 0.55);
-      playTempleBellHigh(now + 5.8, 1.0);
-      playTempleBellHigh(now + 9.8, 1.0);
-    } else {
-      playSingingBowlEdge(now + 0.0);
-      playTempleBell(now + 1.8, 0.55);
-      playTempleBell(now + 5.8, 1.0);
-      playTempleBell(now + 9.8, 1.0);
-    }
-  }
-  if (ctx.state === 'suspended') { ctx.resume().then(doPlay); } else { doPlay(); }
 }
 
 // ─── Unified play functions ───────────────────────────────────────
@@ -609,6 +578,7 @@ var intervalBellMs    = 0;
 var nextIntervalAt    = null;
 var currentSound      = 'bell';
 var selectedMinutes   = 20;
+var selectedSeconds   = 0;
 var prepareSeconds    = 10;
 
 // ─── DOM refs ────────────────────────────────────────────────────
@@ -617,10 +587,7 @@ var display        = document.getElementById('display');
 var statusEl       = document.getElementById('status');
 var btnStart       = document.getElementById('btn-start');
 var btnStop        = document.getElementById('btn-stop');
-var soundSelect    = document.getElementById('sound-select');
 var intervalSelect = document.getElementById('interval-select');
-var customMin      = document.getElementById('custom-min');
-var presets        = document.querySelectorAll('.preset');
 
 // ─── Navigation ──────────────────────────────────────────────────
 
@@ -642,39 +609,87 @@ function formatTime(secs) {
   return m + ':' + s;
 }
 
-function selectPreset(min) {
-  selectedMinutes = min;
-  presets.forEach(function(p) {
-    p.classList.toggle('selected', +p.dataset.min === min);
-  });
-  customMin.value = '';
-  display.textContent = formatTime(min * 60);
+function getTotalSeconds() {
+  return selectedMinutes * 60 + selectedSeconds;
 }
 
-presets.forEach(function(p) {
-  p.addEventListener('click', function() { selectPreset(+p.dataset.min); });
+function setTime(totalSecs) {
+  totalSecs       = Math.min(28800, Math.max(60, totalSecs));
+  selectedMinutes = Math.floor(totalSecs / 60);
+  selectedSeconds = totalSecs % 60;
+  display.textContent = formatTime(totalSecs);
+}
+
+// ─── Interactive timer display ────────────────────────────────────
+
+var displayWrap = document.getElementById('display-wrap');
+var dragStartY  = null;
+var dragTotal   = null;
+var dragUnit    = 60;
+
+function changeTime(deltaSecs) {
+  if (timerInterval || countdownInterval) return;
+  setTime(getTotalSeconds() + deltaSecs);
+}
+
+document.getElementById('display-up').addEventListener('click', function(e) {
+  changeTime(e.shiftKey ? 1 : 60);
+});
+document.getElementById('display-down').addEventListener('click', function(e) {
+  changeTime(e.shiftKey ? -1 : -60);
 });
 
-customMin.addEventListener('input', function() {
-  var v = parseInt(customMin.value);
-  if (v > 0) {
-    selectedMinutes = v;
-    presets.forEach(function(p) { p.classList.remove('selected'); });
-    display.textContent = formatTime(v * 60);
-  }
+displayWrap.addEventListener('touchstart', function(e) {
+  if (timerInterval || countdownInterval) return;
+  var touch    = e.touches[0];
+  var rect     = displayWrap.getBoundingClientRect();
+  var leftHalf = (touch.clientX - rect.left) < rect.width / 2;
+  dragStartY   = touch.clientY;
+  dragTotal    = getTotalSeconds();
+  dragUnit     = leftHalf ? 60 : 1;
+}, { passive: true });
+
+displayWrap.addEventListener('touchmove', function(e) {
+  if (dragStartY === null) return;
+  var delta    = Math.round((dragStartY - e.touches[0].clientY) / 12);
+  var newTotal = Math.min(28800, Math.max(60, dragTotal + delta * dragUnit));
+  selectedMinutes     = Math.floor(newTotal / 60);
+  selectedSeconds     = newTotal % 60;
+  display.textContent = formatTime(newTotal);
+}, { passive: true });
+
+displayWrap.addEventListener('touchend', function() {
+  dragStartY = null; dragTotal = null;
+});
+
+displayWrap.addEventListener('mousedown', function(e) {
+  if (timerInterval || countdownInterval) return;
+  var rect     = displayWrap.getBoundingClientRect();
+  var leftHalf = (e.clientX - rect.left) < rect.width / 2;
+  dragUnit   = leftHalf ? 60 : 1;
+  dragStartY = e.clientY;
+  dragTotal  = getTotalSeconds();
+});
+document.addEventListener('mousemove', function(e) {
+  if (dragStartY === null) return;
+  var delta    = Math.round((dragStartY - e.clientY) / 12);
+  var newTotal = Math.min(28800, Math.max(60, dragTotal + delta * dragUnit));
+  selectedMinutes     = Math.floor(newTotal / 60);
+  selectedSeconds     = newTotal % 60;
+  display.textContent = formatTime(newTotal);
+});
+document.addEventListener('mouseup', function() {
+  dragStartY = null; dragTotal = null;
 });
 
 // ─── Start / Stop buttons ────────────────────────────────────────
 
 btnStart.addEventListener('click', function() {
-  unlockAudio(); // synchronous — must be first line for iOS gesture detection
-
-  btnStart.disabled = true;
+  unlockAudio();
+  btnStart.disabled    = true;
   statusEl.textContent = t('status_ready');
-
   if (!noSleep && window.NoSleep) noSleep = new NoSleep();
   if (noSleep) noSleep.enable();
-
   startCountdown();
 });
 
@@ -683,24 +698,15 @@ btnStop.addEventListener('click', stopSession);
 // ─── Prepare Countdown ───────────────────────────────────────────
 
 function startCountdown() {
-  currentSound = soundSelect.value;
   var secsLeft = prepareSeconds;
-
-  if (secsLeft <= 0) {
-    startSession();
-    return;
-  }
-
+  if (secsLeft <= 0) { startSession(); return; }
   btnStart.disabled = true;
   btnStop.disabled  = false;
-
   function updateDisplay() {
     statusEl.textContent = t('status_prepare').replace('{secs}', secsLeft);
     display.textContent  = formatTime(secsLeft);
   }
-
   updateDisplay();
-
   countdownInterval = setInterval(function() {
     secsLeft--;
     if (secsLeft <= 0) {
@@ -716,9 +722,8 @@ function startCountdown() {
 // ─── Session ─────────────────────────────────────────────────────
 
 function startSession() {
-  currentSound    = soundSelect.value;
   intervalBellMs  = +intervalSelect.value * 60 * 1000;
-  plannedDuration = selectedMinutes * 60;
+  plannedDuration = getTotalSeconds();
   sessionStart    = Date.now();
   endTimestamp    = sessionStart + plannedDuration * 1000;
   nextIntervalAt  = intervalBellMs > 0 ? sessionStart + intervalBellMs : null;
@@ -732,19 +737,15 @@ function startSession() {
   setMeditating(true);
   timerInterval = setInterval(tick, 500);
 
-  // Pre-warm AudioContext while gesture is still active
   var ctx = getAudioContext();
   if (ctx.state === 'suspended') ctx.resume();
 
-  // Re-resume AudioContext 2 seconds before end in case iOS suspended it
   var msUntilEnd = plannedDuration * 1000;
   setTimeout(function() {
     var ctx = getAudioContext();
     if (ctx.state === 'suspended') ctx.resume();
   }, Math.max(0, msUntilEnd - 2000));
 }
-
-
 
 function tick() {
   var now       = Date.now();
@@ -766,10 +767,7 @@ function tick() {
     var ctx = getAudioContext();
     function doEnding() {
       var now = ctx.currentTime;
-      if (currentSound === 'none') {
-        stopSilentLoop();
-        return;
-      }
+      if (currentSound === 'none') { stopSilentLoop(); return; }
       if (currentSound === 'chugpi') {
         getChugpiMaster();
         playChugpiNow(now + 0.15, 1.0);
@@ -786,15 +784,9 @@ function tick() {
         playTempleBell(now + 5.8, 1.0);
         playTempleBell(now + 9.8, 1.0);
       }
-      // Stop silent loop after bells have finished
       setTimeout(stopSilentLoop, 13000);
     }
-
-    if (ctx.state === 'suspended') {
-      ctx.resume().then(doEnding);
-    } else {
-      doEnding();
-    }
+    if (ctx.state === 'suspended') { ctx.resume().then(doEnding); } else { doEnding(); }
 
     showNoteField(true, undefined);
     statusEl.textContent = t('status_complete');
@@ -805,8 +797,6 @@ function tick() {
   }
 }
 
-
-
 function stopSession() {
   if (countdownInterval) {
     clearInterval(countdownInterval);
@@ -816,7 +806,7 @@ function stopSession() {
     statusEl.textContent = t('status_ready');
     btnStart.disabled    = false;
     btnStop.disabled     = true;
-    display.textContent  = formatTime(selectedMinutes * 60);
+    display.textContent  = formatTime(getTotalSeconds());
     return;
   }
   if (!timerInterval) return;
@@ -841,22 +831,25 @@ function getSessions() {
   catch(e) { return []; }
 }
 
-function saveSession(completed, actualSecs, note) {   // ← add note param
+function saveSession(completed, actualSecs, note) {
   var sessions = getSessions();
   sessions.unshift({
     id:        Date.now(),
-    date:      new Date(sessionStart).toLocaleDateString({ pl: 'pl-PL', ko: 'ko-KR', en: 'en-GB' }[currentLang] || 'en-GB'),
-    startTime: new Date(sessionStart).toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' }),
+    date:      new Date(sessionStart).toLocaleDateString(
+                 { pl: 'pl-PL', ko: 'ko-KR', en: 'en-GB' }[currentLang] || 'en-GB'),
+    startTime: new Date(sessionStart).toLocaleTimeString('en-GB',
+                 { hour: '2-digit', minute: '2-digit' }),
     planned:   plannedDuration,
     actual:    actualSecs !== undefined ? actualSecs : plannedDuration,
     completed: completed,
     sound:     currentSound,
-    note:      note || ''                              // ← store it
+    note:      note || ''
   });
   localStorage.setItem('meditation_log', JSON.stringify(sessions));
 }
 
 // ─── Session Note ─────────────────────────────────────────────────
+
 function showNoteField(completed, actualSecs) {
   var wrap  = document.getElementById('note-wrap');
   var input = document.getElementById('note-input');
@@ -864,7 +857,6 @@ function showNoteField(completed, actualSecs) {
   if (!wrap) { saveSession(completed, actualSecs, ''); return; }
 
   var saved = false;
-
   input.value        = '';
   input.placeholder  = t('note_placeholder');
   btn.textContent    = t('note_save');
@@ -880,15 +872,11 @@ function showNoteField(completed, actualSecs) {
 
   btn.onclick     = doSave;
   input.onkeydown = function(e) { if (e.key === 'Enter') doSave(); };
-
-  // Auto-save if user navigates away, switches tab, or just ignores the field
-  input.onblur    = function() { setTimeout(doSave, 200); };
+  input.onblur    = function()  { setTimeout(doSave, 200); };
   document.querySelectorAll('.nav-btn').forEach(function(b) {
     b.addEventListener('click', doSave, { once: true });
   });
 }
-
-
 
 function formatDuration(secs) {
   var m = Math.floor(secs / 60);
@@ -897,6 +885,7 @@ function formatDuration(secs) {
 }
 
 // ─── Streak ───────────────────────────────────────────────────────
+
 function computeStreak(sessions) {
   var dateSet = {};
   sessions.forEach(function(s) {
@@ -920,13 +909,14 @@ function computeStreak(sessions) {
 }
 
 // ─── Weekly Chart ─────────────────────────────────────────────────
+
 function buildWeekChart(sessions) {
-  var W = 7, BW = 28, GAP = 8, H = 56, LH = 18;
-  var svgW = W * (BW + GAP) - GAP;
-  var cs = getComputedStyle(document.documentElement);
-  var accent  = cs.getPropertyValue('--accent').trim()  || '#88c0d0';
-  var muted   = cs.getPropertyValue('--muted').trim()   || '#7b8fa1';
-  var border  = cs.getPropertyValue('--border').trim()  || '#2e3a4e';
+  var W = 7, BW = 28, GAP = 8, H = 56, LH = 18, TOPH = 16;
+  var svgW   = W * (BW + GAP) - GAP;
+  var cs     = getComputedStyle(document.documentElement);
+  var accent = cs.getPropertyValue('--accent').trim() || '#88c0d0';
+  var muted  = cs.getPropertyValue('--muted').trim()  || '#7b8fa1';
+  var border = cs.getPropertyValue('--border').trim() || '#2e3a4e';
 
   var dayMins = {}, days = [];
   for (var i = W - 1; i >= 0; i--) {
@@ -951,7 +941,7 @@ function buildWeekChart(sessions) {
     if (dayMins[k] !== undefined) dayMins[k] += Math.round(s.actual / 60);
   });
 
-  var maxM = Math.max(1, Math.max.apply(null, days.map(function(d) { return dayMins[d.key]; })));
+  var maxM     = Math.max(1, Math.max.apply(null, days.map(function(d) { return dayMins[d.key]; })));
   var todayKey = days[W - 1].key;
 
   var bars = days.map(function(day, i) {
@@ -960,16 +950,29 @@ function buildWeekChart(sessions) {
     var x    = i * (BW + GAP);
     var fill = mins > 0 ? accent : border;
     var op   = day.key === todayKey ? '1' : '0.65';
-    return '<rect x="' + x + '" y="' + (H - bh) + '" width="' + BW + '" height="' + bh +
-           '" rx="3" fill="' + fill + '" opacity="' + op + '">' +
-           '<title>' + mins + ' min</title></rect>' +
-           '<text x="' + (x + BW / 2) + '" y="' + (H + LH - 2) +
-           '" text-anchor="middle" font-size="10" fill="' + muted + '">' + day.label + '</text>';
+
+    var barRect = '<rect x="' + x + '" y="' + (H - bh) + '" width="' + BW +
+      '" height="' + bh + '" rx="3" fill="' + fill + '" opacity="' + op + '">' +
+      '<title>' + mins + ' min</title></rect>';
+
+    var minLabel = mins > 0
+      ? '<text x="' + (x + BW / 2) + '" y="' + (H - bh - 4) +
+        '" text-anchor="middle" font-size="9" fill="' + accent +
+        '" opacity="' + op + '">' + mins + '</text>'
+      : '';
+
+    var dayLabel = '<text x="' + (x + BW / 2) + '" y="' + (H + LH - 2) +
+      '" text-anchor="middle" font-size="10" fill="' + muted + '">' + day.label + '</text>';
+
+    return barRect + minLabel + dayLabel;
   }).join('');
 
-  return '<svg width="100%" viewBox="0 0 ' + svgW + ' ' + (H + LH) +
-         '" style="display:block;margin:14px 0 6px">' + bars + '</svg>';
+  return '<svg width="100%" viewBox="0 0 ' + svgW + ' ' + (H + LH + TOPH) +
+    '" style="display:block;margin:14px 0 6px">' +
+    '<g transform="translate(0,' + TOPH + ')">' + bars + '</g></svg>';
 }
+
+// ─── Render Log ───────────────────────────────────────────────────
 
 function renderLog() {
   var sessions  = getSessions();
@@ -1004,17 +1007,14 @@ function renderLog() {
   }).join('');
 }
 
+// ─── CSV Export ───────────────────────────────────────────────────
+
 document.getElementById('btn-export').addEventListener('click', function() {
   var sessions = getSessions();
   var rows = [['Date', 'Start', 'Planned (s)', 'Actual (s)', 'Completed', 'Sound', 'Note']].concat(
     sessions.map(function(s) {
       return [
-        s.date,
-        s.startTime,
-        s.planned,
-        s.actual,
-        s.completed,
-        s.sound,
+        s.date, s.startTime, s.planned, s.actual, s.completed, s.sound,
         '"' + (s.note || '').replace(/"/g, '""') + '"'
       ];
     })
@@ -1026,6 +1026,92 @@ document.getElementById('btn-export').addEventListener('click', function() {
   a.click();
 });
 
+// ─── CSV Import ───────────────────────────────────────────────────
+
+document.getElementById('btn-import-csv').addEventListener('click', function() {
+  document.getElementById('import-csv-file').click();
+});
+
+document.getElementById('import-csv-file').addEventListener('change', function(e) {
+  var file = e.target.files[0];
+  if (!file) return;
+  var reader = new FileReader();
+  reader.onload = function(ev) {
+    try {
+      var lines  = ev.target.result.split(/\r?\n/).filter(function(l) { return l.trim(); });
+      var header = lines[0].split(',');
+
+      function col(name) {
+        return header.findIndex(function(h) {
+          return h.trim().toLowerCase() === name.toLowerCase();
+        });
+      }
+      var iDate      = col('Date');
+      var iStart     = col('Start');
+      var iPlanned   = col('Planned (s)');
+      var iActual    = col('Actual (s)');
+      var iCompleted = col('Completed');
+      var iSound     = col('Sound');
+      var iNote      = col('Note');
+
+      if (iDate < 0 || iActual < 0) throw new Error('Unrecognised CSV format');
+
+      var imported = [];
+      for (var i = 1; i < lines.length; i++) {
+        var parts = [];
+        var line  = lines[i];
+        var inQ   = false;
+        var cur   = '';
+        for (var c = 0; c < line.length; c++) {
+          var ch = line[c];
+          if (ch === '"')              { inQ = !inQ; }
+          else if (ch === ',' && !inQ) { parts.push(cur); cur = ''; }
+          else                         { cur += ch; }
+        }
+        parts.push(cur);
+
+        var actual    = parseInt(parts[iActual])  || 0;
+        var planned   = parseInt(parts[iPlanned]) || actual;
+        var completed = iCompleted >= 0
+          ? (parts[iCompleted].trim().toLowerCase() === 'true')
+          : true;
+        var note     = iNote  >= 0 ? parts[iNote].trim()  : '';
+        var dateStr  = iDate  >= 0 ? parts[iDate].trim()  : '';
+        var startStr = iStart >= 0 ? parts[iStart].trim() : '';
+        var id = Date.parse(dateStr + ' ' + startStr) || (Date.now() - (lines.length - i) * 1000);
+
+        imported.push({
+          id:        id,
+          date:      dateStr,
+          startTime: startStr,
+          planned:   planned,
+          actual:    actual,
+          completed: completed,
+          sound:     iSound >= 0 ? parts[iSound].trim() : 'bell',
+          note:      note
+        });
+      }
+
+      if (!imported.length) throw new Error('No rows found');
+
+      var existing = getSessions();
+      var merged   = existing.slice();
+      imported.forEach(function(s) {
+        if (!merged.find(function(x) { return x.id === s.id; })) merged.push(s);
+      });
+      merged.sort(function(a, b) { return b.id - a.id; });
+      localStorage.setItem('meditation_log', JSON.stringify(merged));
+      renderLog();
+      alert('Imported ' + imported.length + ' sessions from CSV.');
+    } catch(err) {
+      alert('Could not import CSV: ' + err.message);
+    }
+  };
+  reader.readAsText(file);
+  e.target.value = '';
+});
+
+// ─── Clear Log ────────────────────────────────────────────────────
 
 document.getElementById('btn-clear-log').addEventListener('click', function() {
   if (confirm(t('confirm_clear'))) {
@@ -1042,26 +1128,41 @@ var settingsPrepare  = document.getElementById('settings-prepare');
 var settingsSaved    = document.getElementById('settings-saved');
 
 function loadSettings() {
-  var dur   = localStorage.getItem('settings_duration');
-  var sound = localStorage.getItem('settings_sound');
-  var prep  = localStorage.getItem('settings_prepare');
-  if (dur)   settingsDuration.value = dur;
-  if (sound) { settingsSound.value = sound; soundSelect.value = sound; }
+  var dur      = localStorage.getItem('settings_duration');
+  var sound    = localStorage.getItem('settings_sound');
+  var prep     = localStorage.getItem('settings_prepare');
+  var interval = localStorage.getItem('settings_interval');
+
+  if (dur) {
+    settingsDuration.value = dur;
+    selectedMinutes        = parseInt(dur);
+    selectedSeconds        = 0;
+    display.textContent    = formatTime(selectedMinutes * 60);
+  }
+  if (sound)    { settingsSound.value = sound; currentSound = sound; }
+  if (interval) { intervalSelect.value = interval; }
+
   var p = (prep !== null && prep !== '') ? parseInt(prep) : prepareSeconds;
   prepareSeconds = p;
   if (settingsPrepare) settingsPrepare.value = p;
 }
 
 document.getElementById('btn-save-settings').addEventListener('click', function() {
-  var dur   = parseInt(settingsDuration.value);
-  var sound = settingsSound.value;
-  var prep  = parseInt(settingsPrepare.value);
+  var dur      = parseInt(settingsDuration.value);
+  var sound    = settingsSound.value;
+  var prep     = parseInt(settingsPrepare.value);
+  var interval = intervalSelect.value;
+
   if (dur > 0) {
     localStorage.setItem('settings_duration', dur);
-    selectPreset(dur);
+    selectedMinutes     = dur;
+    selectedSeconds     = 0;
+    display.textContent = formatTime(dur * 60);
   }
+  currentSound = sound;
   localStorage.setItem('settings_sound', sound);
-  soundSelect.value = sound;
+  localStorage.setItem('settings_interval', interval);
+
   if (!isNaN(prep) && prep >= 0) {
     prepareSeconds = prep;
     localStorage.setItem('settings_prepare', prep);
@@ -1070,12 +1171,12 @@ document.getElementById('btn-save-settings').addEventListener('click', function(
   setTimeout(function() { settingsSaved.style.display = 'none'; }, 2000);
 });
 
-
 // ─── iOS Install Banner ───────────────────────────────────────────
+
 (function() {
-  var isIos = /iphone|ipad|ipod/i.test(navigator.userAgent);
+  var isIos        = /iphone|ipad|ipod/i.test(navigator.userAgent);
   var isStandalone = window.navigator.standalone === true;
-  var dismissed = localStorage.getItem('iosPromptDismissed');
+  var dismissed    = localStorage.getItem('iosPromptDismissed');
   if (!isIos || isStandalone || dismissed) return;
 
   var banner = document.getElementById('ios-install-banner');
@@ -1083,7 +1184,7 @@ document.getElementById('btn-save-settings').addEventListener('click', function(
   var close  = document.getElementById('ios-install-close');
   if (!banner) return;
 
-  text.textContent = t('ios_install');
+  text.textContent     = t('ios_install');
   banner.style.display = 'flex';
 
   close.addEventListener('click', function() {
