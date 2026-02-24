@@ -205,12 +205,13 @@ function startSilentLoop() {
   if (!silentLoop) {
     silentLoop = new Audio(SILENT_MP3);
     silentLoop.loop = true;
-    silentLoop.volume = 0.001;
+    silentLoop.volume = 0.01;
     silentLoop.setAttribute('playsinline', '');
     silentLoop.setAttribute('x-webkit-airplay', 'deny');
   }
   silentLoop.play().catch(function(e) { console.warn('Silent loop:', e); });
 }
+
 
 function stopSilentLoop() {
   if (silentLoop) {
@@ -731,10 +732,18 @@ function startSession() {
   setMeditating(true);
   timerInterval = setInterval(tick, 500);
 
-  // Pre-warm AudioContext while gesture is still active — required for iOS end bell
+  // Pre-warm AudioContext while gesture is still active
   var ctx = getAudioContext();
   if (ctx.state === 'suspended') ctx.resume();
+
+  // Re-resume AudioContext 2 seconds before end in case iOS suspended it
+  var msUntilEnd = plannedDuration * 1000;
+  setTimeout(function() {
+    var ctx = getAudioContext();
+    if (ctx.state === 'suspended') ctx.resume();
+  }, Math.max(0, msUntilEnd - 2000));
 }
+
 
 
 function tick() {
@@ -753,13 +762,14 @@ function tick() {
     timerInterval = null;
     setMeditating(false);
     if (noSleep) noSleep.disable();
-    stopSilentLoop();
 
-    // Schedule ending bells via AudioContext clock — required for iOS
     var ctx = getAudioContext();
     function doEnding() {
       var now = ctx.currentTime;
-      if (currentSound === 'none') return;
+      if (currentSound === 'none') {
+        stopSilentLoop();
+        return;
+      }
       if (currentSound === 'chugpi') {
         getChugpiMaster();
         playChugpiNow(now + 0.15, 1.0);
@@ -776,7 +786,10 @@ function tick() {
         playTempleBell(now + 5.8, 1.0);
         playTempleBell(now + 9.8, 1.0);
       }
+      // Stop silent loop after bells have finished
+      setTimeout(stopSilentLoop, 13000);
     }
+
     if (ctx.state === 'suspended') {
       ctx.resume().then(doEnding);
     } else {
@@ -791,6 +804,7 @@ function tick() {
     display.textContent  = formatTime(plannedDuration);
   }
 }
+
 
 
 function stopSession() {
