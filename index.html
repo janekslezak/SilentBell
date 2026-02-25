@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="en" data-theme="dark">
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
@@ -27,12 +27,12 @@
   </header>
 
   <nav>
-    <button class="nav-btn active" data-view="timer" data-i18n="nav_timer">Timer</button>
-    <button class="nav-btn" data-view="log" data-i18n="nav_log">Log</button>
-    <button class="nav-btn" data-view="settings" data-i18n="nav_settings">Settings</button>
+    <button class="nav-btn active" data-view="timer"    data-i18n="nav_timer">Timer</button>
+    <button class="nav-btn"        data-view="log"      data-i18n="nav_log">Log</button>
+    <button class="nav-btn"        data-view="settings" data-i18n="nav_settings">Settings</button>
   </nav>
 
-  <!-- Timer view -->
+  <!-- ── Timer view ── -->
   <div id="view-timer" class="view active">
 
     <div id="display-wrap">
@@ -54,17 +54,9 @@
       <button id="btn-stop"  data-i18n="btn_stop" disabled>Stop</button>
     </div>
 
-    <div id="note-wrap" style="display:none; flex-direction:column; gap:6px; margin-top:10px;">
-      <input id="note-input" type="text" maxlength="80"
-             style="width:100%; padding:7px 10px; background:var(--surface);
-                    border:1px solid var(--border); border-radius:var(--radius);
-                    color:var(--text); font-size:16px; font-family:inherit;
-                    box-sizing:border-box;">
-      <button id="note-save-btn"
-              style="width:100%; padding:7px 0; background:transparent;
-                     color:var(--accent); border:1px solid var(--accent);
-                     border-radius:var(--radius); font-size:0.85rem;
-                     font-family:inherit; cursor:pointer;">Save ✓</button>
+    <div id="note-wrap" class="note-wrap">
+      <input id="note-input" type="text" maxlength="80" class="text-input">
+      <button id="note-save-btn" class="btn-accent-outline">Save ✓</button>
     </div>
 
     <div class="lotus-figure">
@@ -90,73 +82,49 @@
 
   </div><!-- end #view-timer -->
 
-  <!-- Log view -->
+  <!-- ── Log view ── -->
   <div id="view-log" class="view">
     <h2 data-i18n="nav_log">Log</h2>
     <div id="log-summary"></div>
     <div id="log-chart"></div>
 
-    <div id="manual-entry" style="display:none; flex-direction:column; gap:8px;
-         margin:12px 0; padding:12px; background:var(--surface);
-         border:1px solid var(--border); border-radius:var(--radius);">
-      <div style="font-size:0.85rem; font-weight:600; color:var(--accent)"
-           data-i18n="manual_title">Log Manual Session</div>
-      <div style="display:flex; gap:8px; flex-wrap:wrap;">
-        <input type="date" id="manual-date"
-               style="flex:1; min-width:120px; padding:6px 8px;
-                      background:var(--bg); border:1px solid var(--border);
-                      border-radius:var(--radius); color:var(--text);
-                      font-family:inherit; font-size:15px;" />
-        <input type="time" id="manual-time"
-               style="flex:1; min-width:100px; padding:6px 8px;
-                      background:var(--bg); border:1px solid var(--border);
-                      border-radius:var(--radius); color:var(--text);
-                      font-family:inherit; font-size:15px;" />
-        <input type="number" id="manual-duration" min="1" max="480"
-               data-i18n-placeholder="manual_min_placeholder"
-               placeholder="min"
-               style="width:72px; padding:6px 8px;
-                      background:var(--bg); border:1px solid var(--border);
-                      border-radius:var(--radius); color:var(--text);
-                      font-family:inherit; font-size:15px;" />
+    <div class="log-actions">
+      <button id="btn-manual-log" data-i18n="btn_manual">+ Manual</button>
+      <button id="btn-export"     data-i18n="btn_export">Export CSV</button>
+      <button id="btn-import-csv">Import CSV</button>
+      <input  id="import-csv-file" type="file" accept=".csv" style="display:none;">
+    </div>
+
+    <div id="manual-entry" class="manual-entry">
+      <div class="manual-entry-title" data-i18n="manual_title">Log Manual Session</div>
+      <div class="manual-entry-row">
+        <input type="date"   id="manual-date"     class="text-input manual-date" />
+        <input type="time"   id="manual-time"     class="text-input manual-time" />
+        <input type="number" id="manual-duration" class="text-input manual-duration"
+               min="1" max="480" placeholder="min" />
       </div>
-      <input type="text" id="manual-note" maxlength="80"
-             data-i18n-placeholder="note_placeholder"
-             placeholder="Note (optional)"
-             style="width:100%; padding:6px 8px; box-sizing:border-box;
-                    background:var(--bg); border:1px solid var(--border);
-                    border-radius:var(--radius); color:var(--text);
-                    font-family:inherit; font-size:15px;" />
-      <div style="display:flex; gap:8px;">
-        <button id="manual-save-btn" data-i18n="btn_save"
-                style="flex:1; padding:7px 0; background:var(--accent);
-                       color:#fff; border:none; border-radius:var(--radius);
-                       font-family:inherit; font-size:0.9rem; cursor:pointer;">Save</button>
-        <button id="manual-cancel-btn"
-                style="flex:1; padding:7px 0; background:transparent;
-                       color:var(--text-muted); border:1px solid var(--border);
-                       border-radius:var(--radius); font-family:inherit;
-                       font-size:0.9rem; cursor:pointer;">✕</button>
+      <input type="text" id="manual-note" maxlength="80" class="text-input"
+             placeholder="Note (optional)" />
+      <div class="manual-entry-actions">
+        <button id="manual-save-btn"   class="btn-accent" data-i18n="btn_save">Save</button>
+        <button id="manual-cancel-btn" class="btn-ghost">&#10005;</button>
       </div>
     </div>
 
     <ul id="log-list"></ul>
-    <div class="log-actions">
-      <button id="btn-manual-log" data-i18n="btn_manual">+ Manual</button>
-      <button id="btn-export"      data-i18n="btn_export">Export CSV</button>
-      <button id="btn-import-csv">Import CSV</button>
-      <button id="btn-clear-log"   data-i18n="btn_clear">Clear Log</button>
-      <input  id="import-csv-file" type="file" accept=".csv" style="display:none;">
+
+    <div class="log-actions log-actions--center">
+      <button id="btn-clear-log" data-i18n="btn_clear">Clear Log</button>
     </div>
   </div>
 
-  <!-- Settings view -->
+  <!-- ── Settings view ── -->
   <div id="view-settings" class="view">
     <h2 data-i18n="nav_settings">Settings</h2>
 
     <div class="field-group">
       <label class="field-label" data-i18n="settings_duration">Default duration (min)</label>
-      <input type="number" id="settings-duration" min="1" max="480" style="font-size:16px;" />
+      <input type="number" id="settings-duration" min="1" max="480" />
     </div>
 
     <div class="field-group">
@@ -185,20 +153,20 @@
 
     <div class="field-group">
       <label class="field-label" data-i18n="settings_prepare">Prepare countdown (sec)</label>
-      <input type="number" id="settings-prepare" min="0" max="60" style="font-size:16px;" />
+      <input type="number" id="settings-prepare" min="0" max="60" />
     </div>
-<div class="field-group">
-  <label class="field-label" data-i18n="settings_notes">Session notes</label>
-  <select id="settings-notes">
-    <option value="on"  data-i18n="notes_on">Enabled</option>
-    <option value="off" data-i18n="notes_off">Disabled</option>
-  </select>
-</div>
+
+    <div class="field-group">
+      <label class="field-label" data-i18n="settings_notes">Session notes</label>
+      <select id="settings-notes">
+        <option value="on"  data-i18n="notes_on">Enabled</option>
+        <option value="off" data-i18n="notes_off">Disabled</option>
+      </select>
+    </div>
 
   </div>
 
-
-  <!-- iOS install banner -->
+  <!-- iOS install banner — shown only by JS on eligible iOS devices -->
   <div id="ios-install-banner" style="display:none">
     <span id="ios-install-text">To install: tap
       <svg width="16" height="16" viewBox="0 0 50 50" fill="currentColor"
@@ -212,19 +180,19 @@
   </div>
 
   <script src="NoSleep.min.js"></script>
-  <script src="app.js"></script>
+  <script type="module" src="app.js"></script>
 
   <footer class="footer">
     <div class="container">
       <div class="footer-row">
-        <p>&copy; 2026 Silent Bell - v1.1.0</p>
+        <p>&copy; 2026 Silent Bell - v1.2.0</p>
       </div>
       <div class="footer-row">
         <p>
           <a href="https://github.com/janekslezak/SilentBell" target="_blank" rel="noopener">GitHub</a>
           -
           <a href="https://github.com/janekslezak/SilentBell/blob/main/CODE_OF_CONDUCT.md" target="_blank" rel="noopener">Code of Conduct</a>
-          - 
+          -
           <a href="https://github.com/janekslezak/SilentBell/blob/main/README.md" target="_blank" rel="noopener">Readme</a>
         </p>
       </div>
@@ -236,4 +204,3 @@
 
 </body>
 </html>
-

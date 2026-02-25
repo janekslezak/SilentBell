@@ -177,6 +177,8 @@ nav {
 
 /* ── Inputs & Selects ── */
 input[type="number"],
+input[type="date"],
+input[type="time"],
 select {
   width: 100%;
   padding: 13px 14px;
@@ -218,7 +220,7 @@ select {
 
 #btn-test-sound:hover { border-color: var(--accent); }
 
-/* ── Lotus figure — hidden by default ── */
+/* ── Lotus figure ── */
 .lotus-figure {
   display: none;
   justify-content: center;
@@ -258,6 +260,43 @@ select {
 
 button:disabled { opacity: 0.35; pointer-events: none; }
 
+/* ── Shared text input ── */
+.text-input {
+  width: 100%;
+  padding: 7px 10px;
+  box-sizing: border-box;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  color: var(--text);
+  font-size: 15px;
+  font-family: inherit;
+  -webkit-appearance: none;
+  appearance: none;
+}
+
+/* ── Note wrap ── */
+.note-wrap {
+  display: none;
+  flex-direction: column;
+  gap: 6px;
+  margin-top: 10px;
+}
+
+/* ── Accent outline button ── */
+.btn-accent-outline {
+  width: 100%;
+  padding: 7px 0;
+  background: transparent;
+  color: var(--accent);
+  border: 1px solid var(--accent);
+  border-radius: var(--radius);
+  font-size: 0.85rem;
+  font-family: inherit;
+  cursor: pointer;
+  touch-action: manipulation;
+}
+
 /* ── Log ── */
 h2 { font-size: 1.1rem; font-weight: 400; color: var(--accent); }
 
@@ -292,11 +331,17 @@ h2 { font-size: 1.1rem; font-weight: 400; color: var(--accent); }
   margin-top: 3px;
 }
 
-/* ── Log actions ── */
 .log-actions {
   display: flex;
   flex-wrap: wrap;
   gap: 10px;
+  justify-content: center;
+  width: 100%;
+}
+
+
+.log-actions--center {
+  justify-content: center;
 }
 
 /* ── Secondary buttons ── */
@@ -304,6 +349,7 @@ h2 { font-size: 1.1rem; font-weight: 400; color: var(--accent); }
 #btn-import-csv,
 #btn-clear-log,
 #btn-manual-log {
+  flex: 1 1 130px;           /* ← moved here, wins over old rules */
   padding: 14px;
   border: 1px solid var(--border);
   border-radius: var(--radius);
@@ -317,13 +363,77 @@ h2 { font-size: 1.1rem; font-weight: 400; color: var(--accent); }
   transition: background 0.3s, color 0.3s;
 }
 
-#btn-manual-log {
-  color: var(--accent);
-  border-color: var(--accent);
+#btn-manual-log { color: var(--accent); border-color: var(--accent); }
+#btn-clear-log  {
+  color: var(--danger);
+  border-color: var(--danger);
+  flex: 0 0 auto;            /* ← Clear Log stays its own width, centered */
+  min-width: 140px;
 }
 
+#btn-manual-log { color: var(--accent); border-color: var(--accent); }
+#btn-clear-log  { color: var(--danger); border-color: var(--danger); }
 
-#btn-clear-log { color: var(--danger); border-color: var(--danger); }
+/* ── Manual entry form ── */
+.manual-entry {
+  display: none;
+  flex-direction: column;
+  gap: 8px;
+  margin: 4px 0 8px;
+  padding: 12px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+}
+
+.manual-entry-title {
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: var(--accent);
+}
+
+.manual-entry-row {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.manual-date,
+.manual-time     { flex: 1; min-width: 100px; padding: 7px 10px; }
+.manual-duration { width: 72px; padding: 7px 10px; }
+
+.manual-entry-actions { display: flex; gap: 8px; }
+
+/* ── Filled accent button ── */
+.btn-accent {
+  flex: 1;
+  padding: 7px 0;
+  background: var(--accent);
+  color: #fff;
+  border: none;
+  border-radius: var(--radius);
+  font-family: inherit;
+  font-size: 0.9rem;
+  cursor: pointer;
+  touch-action: manipulation;
+}
+
+/* ── Ghost button ── */
+.btn-ghost {
+  flex: 1;
+  padding: 7px 0;
+  background: transparent;
+  color: var(--muted);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  font-family: inherit;
+  font-size: 0.9rem;
+  cursor: pointer;
+  touch-action: manipulation;
+}
+
+/* ── Manual log badge ── */
+.log-manual-badge { opacity: 0.6; font-size: 0.8em; }
 
 /* ── Meditation active state ── */
 #view-timer.meditating {
@@ -335,17 +445,14 @@ h2 { font-size: 1.1rem; font-weight: 400; color: var(--accent); }
   flex-direction: column;
 }
 
-/* Reorder elements during session */
 #view-timer.meditating .lotus-figure { order: 1; display: flex; }
 #view-timer.meditating #display-wrap { order: 2; margin: 0; }
 #view-timer.meditating #status       { order: 3; }
 #view-timer.meditating .controls     { order: 4; }
 #view-timer.meditating #note-wrap    { order: 5; }
 
-/* Hide arrows during session */
 #view-timer.meditating #display-arrows { display: none; }
 
-/* Lotus pulse animation */
 #view-timer.meditating .lotus-svg {
   animation: lotus-pulse 4s ease-in-out infinite;
 }
@@ -355,7 +462,6 @@ h2 { font-size: 1.1rem; font-weight: 400; color: var(--accent); }
   50%       { opacity: 0.35; transform: scale(0.96); }
 }
 
-/* Controls during session */
 #view-timer.meditating .controls {
   flex-direction: column;
   align-items: center;
@@ -393,6 +499,7 @@ footer a {
 
 /* ── iOS Install Banner ── */
 #ios-install-banner {
+  display: none;
   position: fixed;
   bottom: 20px;
   left: 50%;
@@ -403,7 +510,6 @@ footer a {
   border: 1px solid var(--accent);
   border-radius: var(--radius);
   padding: 14px 16px;
-  display: flex;
   align-items: center;
   justify-content: space-between;
   gap: 12px;
@@ -411,12 +517,6 @@ footer a {
   color: var(--text);
   z-index: 100;
   box-shadow: 0 4px 24px rgba(0,0,0,0.35);
-  animation: banner-slide-up 0.4s ease;
-}
-
-@keyframes banner-slide-up {
-  from { opacity: 0; transform: translateX(-50%) translateY(20px); }
-  to   { opacity: 1; transform: translateX(-50%) translateY(0);    }
 }
 
 #ios-install-text { flex: 1; line-height: 1.5; }
@@ -430,4 +530,3 @@ footer a {
   padding: 4px 6px;
   flex-shrink: 0;
 }
-
