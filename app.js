@@ -40,7 +40,12 @@ const STRINGS = {
     log_streak:        'Streak',
     log_days:          'days',
     note_placeholder:  'Note (optional)',
-    note_save:         'Save ✓'
+    note_save:         'Save ✓',
+    btn_manual:        '+ Manual',
+    manual_title:      'Log Manual Session',
+    manual_saved:      'Session saved ✓',
+    manual_err_dur:    'Please enter a valid duration.',
+    log_manual:        '✎ manual'
   },
   pl: {
     app_title:         'Dzwon Ciszy',
@@ -81,7 +86,12 @@ const STRINGS = {
     log_streak:        'Seria',
     log_days:          'dni',
     note_placeholder:  'Notatka (opcjonalna)',
-    note_save:         'Zapisz ✓'
+    note_save:         'Zapisz ✓',
+    btn_manual:        '+ Ręcznie',
+    manual_title:      'Dodaj sesję ręcznie',
+    manual_saved:      'Sesja zapisana ✓',
+    manual_err_dur:    'Podaj prawidłowy czas trwania.',
+    log_manual:        '✎ ręcznie'
   },
   ko: {
     app_title:         '침묵의 종',
@@ -122,7 +132,12 @@ const STRINGS = {
     log_streak:        '연속',
     log_days:          '일',
     note_placeholder:  '메모 (선택)',
-    note_save:         '저장 ✓'
+    note_save:         '저장 ✓',
+    btn_manual:        '+ 수동 입력',
+    manual_title:      '수동 세션 기록',
+    manual_saved:      '세션 저장됨 ✓',
+    manual_err_dur:    '올바른 시간을 입력하세요.',
+    log_manual:        '✎ 수동'
   }
 };
 
@@ -1064,6 +1079,7 @@ function renderLog() {
       '<div class="log-detail">' +
         formatDuration(s.actual) + ' / ' + formatDuration(s.planned) + ' ' + t('log_planned') +
         (!s.completed ? ' &nbsp; ' + t('log_stopped') : '') +
+        (s.manual ? ' &nbsp; <span style="opacity:0.6;font-size:0.8em">' + t('log_manual') + '</span>' : '') +
       '</div>' + noteHtml + '</li>';
   }).join('');
 }
@@ -1170,6 +1186,72 @@ document.getElementById('import-csv-file').addEventListener('change', function(e
   };
   reader.readAsText(file);
   e.target.value = '';
+});
+
+// ─── Manual Session Entry ────────────────────────────────────────
+
+function saveManualSession(dateStr, timeStr, durationMins, note) {
+  var sessions = getSessions();
+  var id = Date.parse(dateStr + 'T' + timeStr) || Date.now();
+  var locale = { pl: 'pl-PL', ko: 'ko-KR', en: 'en-GB' }[currentLang] || 'en-GB';
+  var d = new Date(id);
+  sessions.push({
+    id:        id,
+    date:      d.toLocaleDateString(locale),
+    startTime: timeStr,
+    planned:   durationMins * 60,
+    actual:    durationMins * 60,
+    completed: true,
+    sound:     'none',
+    note:      note || '',
+    manual:    true
+  });
+  sessions.sort(function(a, b) { return b.id - a.id; });
+  localStorage.setItem('meditation_log', JSON.stringify(sessions));
+}
+
+document.getElementById('btn-manual-log').addEventListener('click', function() {
+  var form = document.getElementById('manual-entry');
+  var visible = form.style.display === 'flex';
+  if (visible) {
+    form.style.display = 'none';
+  } else {
+    var now = new Date();
+    var pad = function(n) { return String(n).padStart(2, '0'); };
+    document.getElementById('manual-date').value =
+      now.getFullYear() + '-' + pad(now.getMonth() + 1) + '-' + pad(now.getDate());
+    document.getElementById('manual-time').value =
+      pad(now.getHours()) + ':' + pad(now.getMinutes());
+    document.getElementById('manual-duration').value = '';
+    document.getElementById('manual-note').value = '';
+    document.getElementById('manual-note').placeholder = t('note_placeholder');
+    form.style.display = 'flex';
+  }
+});
+
+document.getElementById('manual-cancel-btn').addEventListener('click', function() {
+  document.getElementById('manual-entry').style.display = 'none';
+});
+
+document.getElementById('manual-save-btn').addEventListener('click', function() {
+  var dateVal = document.getElementById('manual-date').value;
+  var timeVal = document.getElementById('manual-time').value;
+  var durVal  = parseInt(document.getElementById('manual-duration').value);
+  var noteVal = document.getElementById('manual-note').value.trim();
+  if (!durVal || durVal < 1) {
+    alert(t('manual_err_dur'));
+    return;
+  }
+  if (!dateVal) {
+    var now = new Date();
+    var pad = function(n) { return String(n).padStart(2, '0'); };
+    dateVal = now.getFullYear() + '-' + pad(now.getMonth() + 1) + '-' + pad(now.getDate());
+  }
+  if (!timeVal) timeVal = '00:00';
+  saveManualSession(dateVal, timeVal, durVal, noteVal);
+  document.getElementById('manual-entry').style.display = 'none';
+  renderLog();
+  alert(t('manual_saved'));
 });
 
 // ─── Clear Log ────────────────────────────────────────────────────
