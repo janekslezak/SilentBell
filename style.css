@@ -302,7 +302,8 @@ h2 { font-size: 1.1rem; font-weight: 400; color: var(--accent); }
 /* ── Secondary buttons ── */
 #btn-export,
 #btn-import-csv,
-#btn-clear-log {
+#btn-clear-log,
+#btn-manual-log {
   padding: 14px;
   border: 1px solid var(--border);
   border-radius: var(--radius);
@@ -315,6 +316,12 @@ h2 { font-size: 1.1rem; font-weight: 400; color: var(--accent); }
   touch-action: manipulation;
   transition: background 0.3s, color 0.3s;
 }
+
+#btn-manual-log {
+  color: var(--accent);
+  border-color: var(--accent);
+}
+
 
 #btn-clear-log { color: var(--danger); border-color: var(--danger); }
 

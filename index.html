@@ -95,8 +95,54 @@
     <h2 data-i18n="nav_log">Log</h2>
     <div id="log-summary"></div>
     <div id="log-chart"></div>
+
+    <div id="manual-entry" style="display:none; flex-direction:column; gap:8px;
+         margin:12px 0; padding:12px; background:var(--surface);
+         border:1px solid var(--border); border-radius:var(--radius);">
+      <div style="font-size:0.85rem; font-weight:600; color:var(--accent)"
+           data-i18n="manual_title">Log Manual Session</div>
+      <div style="display:flex; gap:8px; flex-wrap:wrap;">
+        <input type="date" id="manual-date"
+               style="flex:1; min-width:120px; padding:6px 8px;
+                      background:var(--bg); border:1px solid var(--border);
+                      border-radius:var(--radius); color:var(--text);
+                      font-family:inherit; font-size:15px;" />
+        <input type="time" id="manual-time"
+               style="flex:1; min-width:100px; padding:6px 8px;
+                      background:var(--bg); border:1px solid var(--border);
+                      border-radius:var(--radius); color:var(--text);
+                      font-family:inherit; font-size:15px;" />
+        <input type="number" id="manual-duration" min="1" max="480"
+               data-i18n-placeholder="manual_min_placeholder"
+               placeholder="min"
+               style="width:72px; padding:6px 8px;
+                      background:var(--bg); border:1px solid var(--border);
+                      border-radius:var(--radius); color:var(--text);
+                      font-family:inherit; font-size:15px;" />
+      </div>
+      <input type="text" id="manual-note" maxlength="80"
+             data-i18n-placeholder="note_placeholder"
+             placeholder="Note (optional)"
+             style="width:100%; padding:6px 8px; box-sizing:border-box;
+                    background:var(--bg); border:1px solid var(--border);
+                    border-radius:var(--radius); color:var(--text);
+                    font-family:inherit; font-size:15px;" />
+      <div style="display:flex; gap:8px;">
+        <button id="manual-save-btn" data-i18n="btn_save"
+                style="flex:1; padding:7px 0; background:var(--accent);
+                       color:#fff; border:none; border-radius:var(--radius);
+                       font-family:inherit; font-size:0.9rem; cursor:pointer;">Save</button>
+        <button id="manual-cancel-btn"
+                style="flex:1; padding:7px 0; background:transparent;
+                       color:var(--text-muted); border:1px solid var(--border);
+                       border-radius:var(--radius); font-family:inherit;
+                       font-size:0.9rem; cursor:pointer;">✕</button>
+      </div>
+    </div>
+
     <ul id="log-list"></ul>
     <div class="log-actions">
+      <button id="btn-manual-log" data-i18n="btn_manual">+ Manual</button>
       <button id="btn-export"      data-i18n="btn_export">Export CSV</button>
       <button id="btn-import-csv">Import CSV</button>
       <button id="btn-clear-log"   data-i18n="btn_clear">Clear Log</button>
