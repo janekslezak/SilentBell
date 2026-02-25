@@ -3,10 +3,7 @@ Open source MIT.
 
 Clearing website data will clear the log, to keep the data, it can be exported beforehand and imported after the cleanup.
 
-On iOS, do not manually turn of the screen, it will prevent the sound from playing due to Safari blocking Web Audio on screen turned off (on Android it should work anyway).
-Could be avoided using actual audio files instead, however it would make the app heavier.
-
-Used NoSleep.min.js that was kindly made available here:
+Used NoSleep.min.js that was kidnly made available here:
 https://github.com/richtr/NoSleep.js/blob/master/dist/NoSleep.min.js
 
 Available on and powered by Netlify:
