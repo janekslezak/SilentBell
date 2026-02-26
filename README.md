@@ -11,6 +11,7 @@ A lightweight meditation timer with built in log. No accounts, no tracking, no a
   
 Set the time and hit start. After the session, details are automatically saved to your log. Add a note afterward if you like, or log sessions you did without the app.
 In settings, adjust default duration, sound, interval bells, preparation countdown, and toggle notes on or off.
+In iOS do not manually turn off the screen - it will prevent the sound from ringing at the end of session.
 
   Installation 
   
