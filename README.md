@@ -15,21 +15,24 @@ In settings, adjust default duration, sound, interval bells, preparation countdo
   Installation 
   
 Option 1: Use in browser (quickest)
-Open jwaseon.netlify.app in any modern browser and start meditating immediately. No installation required.
+
+Open https://jwaseon.netlify.app/ in any modern browser and start meditating immediately. No installation required.
+
 Option 2: Install as app (recommended)
+
 Silent Bell works as a Progressive Web App—install it once, use it anytime, even offline.
 
- 1) iPhone/iPad (Safari):
+ a) iPhone/iPad (Safari):
       -  Open the site in Safari
       -  Tap the Share button (rectangle with arrow)
       -  Scroll down and tap "Add to Home Screen"
       -  Tap "Add"
- 2) Android (Chrome):
+ b) Android (Chrome):
       -  Open the site in Chrome
       -  Tap the menu (three dots) or look for the install prompt
       -  Tap "Install" or "Add to Home Screen"
 
-Once installed, Silent Bell launches like any native app—no browser chrome, no address bar, just the timer.
+Once installed, Silent Bell launches like any native app - no browser, no address bar, just the timer.
 
   Credits
   
