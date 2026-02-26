@@ -1,12 +1,43 @@
-Simple meditation timer with locally stored log, can be used as PWA.
-Open source MIT.
+Silent Bell
+A lightweight meditation timer with built in log. No accounts, no tracking, no ads.
 
-Clearing website data will clear the log, to keep the data, it can be exported beforehand and imported after the cleanup.
+  - 225KB – loads instantly, works offline
+  - Private log – your sessions stay on your device
+  - PWA-ready – install on phone or desktop
+  - Open source (MIT)
 
-Used NoSleep.min.js that was kidnly made available here:
+  How to use
+Set the time and hit start. After the session, details are automatically saved to your log. Add a note afterward if you like, or log sessions you did without the app.
+In settings, adjust default duration, sound, interval bells, preparation countdown, and toggle notes on or off.
+
+  Installation 
+Option 1: Use in browser (quickest)
+Open jwaseon.netlify.app in any modern browser and start meditating immediately. No installation required.
+Option 2: Install as app (recommended)
+Silent Bell works as a Progressive Web App—install it once, use it anytime, even offline.
+
+ 1) iPhone/iPad (Safari):
+      -  Open the site in Safari
+      -  Tap the Share button (rectangle with arrow)
+      -  Scroll down and tap "Add to Home Screen"
+      -  Tap "Add"
+ 2) Android (Chrome):
+      -  Open the site in Chrome
+      -  Tap the menu (three dots) or look for the install prompt
+      -  Tap "Install" or "Add to Home Screen"
+
+Once installed, Silent Bell launches like any native app—no browser chrome, no address bar, just the timer.
+
+  Credits
+Uses NoSleep.min.js to keep your screen awake during sessions:
 https://github.com/richtr/NoSleep.js/blob/master/dist/NoSleep.min.js
 
-Available on and powered by Netlify:
-https://jwaseon.netlify.app/
+  Feedback & bugs
+I'd be happy to hear from you with all the feedback and bug reports. 
+Open issue, drop me a line or use contact form:
+https://forms.gle/A5zSLUBLg5TKHnk66
 
+
+Available on & powered by Netlify:
+https://jwaseon.netlify.app/
 
