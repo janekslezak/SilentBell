@@ -49,7 +49,7 @@ const STRINGS = {
   },
   pl: {
     app_title:         'Dzwon Ciszy',
-    nav_timer:         'Timer',
+    nav_timer:         'Minutnik',
     nav_log:           'Dziennik',
     nav_settings:      'Ustawienia',
     status_ready:      'Gotowy',
@@ -87,7 +87,7 @@ const STRINGS = {
     log_days:          'dni',
     note_placeholder:  'Notatka (opcjonalna)',
     note_save:         'Zapisz ✓',
-    btn_manual:        '+ Ręcznie',
+    btn_manual:        '+ Dodaj Ręcznie',
     manual_title:      'Dodaj sesję ręcznie',
     manual_saved:      'Sesja zapisana ✓',
     manual_err_dur:    'Podaj prawidłowy czas trwania.',
