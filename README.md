@@ -1,4 +1,5 @@
 Silent Bell
+
 A lightweight meditation timer with built in log. No accounts, no tracking, no ads.
 
   - 225KB – loads instantly, works offline
@@ -7,10 +8,12 @@ A lightweight meditation timer with built in log. No accounts, no tracking, no a
   - Open source (MIT)
 
   How to use
+  
 Set the time and hit start. After the session, details are automatically saved to your log. Add a note afterward if you like, or log sessions you did without the app.
 In settings, adjust default duration, sound, interval bells, preparation countdown, and toggle notes on or off.
 
   Installation 
+  
 Option 1: Use in browser (quickest)
 Open jwaseon.netlify.app in any modern browser and start meditating immediately. No installation required.
 Option 2: Install as app (recommended)
@@ -29,10 +32,12 @@ Silent Bell works as a Progressive Web App—install it once, use it anytime, ev
 Once installed, Silent Bell launches like any native app—no browser chrome, no address bar, just the timer.
 
   Credits
+  
 Uses NoSleep.min.js to keep your screen awake during sessions:
 https://github.com/richtr/NoSleep.js/blob/master/dist/NoSleep.min.js
 
   Feedback & bugs
+  
 I'd be happy to hear from you with all the feedback and bug reports. 
 Open issue, drop me a line or use contact form:
 https://forms.gle/A5zSLUBLg5TKHnk66
