@@ -1,4 +1,4 @@
-const CACHE = 'chimukuijong-v5';
+const CACHE = 'silent-bell-v6';
 const ASSETS = [
   '/',
   'index.html',
@@ -7,7 +7,14 @@ const ASSETS = [
   'manifest.json',
   'icon-192.png',
   'icon-512.png',
-  'NoSleep.min.js'
+  'NoSleep.min.js',
+  'modules/i18n.js',
+  'modules/audio.js',
+  'modules/audio-context.js',
+  'modules/silent-loop.js',
+  'modules/timer.js',
+  'modules/log.js',
+  'modules/settings.js'
 ];
 
 self.addEventListener('install', e => {
@@ -40,4 +47,3 @@ self.addEventListener('fetch', e => {
     })
   );
 });
-
