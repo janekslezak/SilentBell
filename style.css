@@ -557,3 +557,16 @@ footer a {
   padding: 4px 6px;
   flex-shrink: 0;
 }
+
+/* Chart toggle buttons */
+.chart-toggle-btn {
+  transition: all 0.2s ease;
+}
+
+.chart-toggle-btn:hover {
+  border-color: var(--accent);
+}
+
+.chart-toggle-btn.active {
+  font-weight: 500;
+}

@@ -6,6 +6,9 @@ let sessionStart = null;
 let plannedDuration = 0;
 let currentSound = 'bell';
 
+// Chart mode state: 'week' or 'average'
+let chartMode = localStorage.getItem('log_chart_mode') || 'week';
+
 export function setSessionStart(start) { sessionStart = start; }
 export function setPlannedDuration(duration) { plannedDuration = duration; }
 export function setCurrentSoundForLog(sound) { currentSound = sound; }
@@ -69,15 +72,43 @@ export function computeAvgDaily(sessions) {
   return Math.round(totalSecs / uniqueDays);
 }
 
-// ─── Weekly Chart ─────────────────────────────────────────────────
+// ─── Chart Helpers ────────────────────────────────────────────────
+
+function getChartColors() {
+  var cs = getComputedStyle(document.documentElement);
+  return {
+    accent: cs.getPropertyValue('--accent').trim() || '#88c0d0',
+    muted: cs.getPropertyValue('--muted').trim() || '#7b8fa1',
+    border: cs.getPropertyValue('--border').trim() || '#2e3a4e'
+  };
+}
+
+function buildEmptyChart(svgW, H, LH, TOPH, colors) {
+  var W = 7, BW = 28, GAP = 8;
+  var bars = [];
+  for (var i = 0; i < 7; i++) {
+    var x = i * (BW + GAP);
+    var labelDate = new Date(2024, 0, 1);
+    labelDate.setDate(labelDate.getDate() + i);
+    var label = labelDate.toLocaleDateString('en-GB', { weekday: 'narrow' });
+    
+    bars.push('<rect x="' + x + '" y="' + (H - 2) + '" width="' + BW +
+      '" height="2" rx="1" fill="' + colors.border + '" opacity="0.35"></rect>' +
+      '<text x="' + (x + BW / 2) + '" y="' + (H + LH - 2) +
+      '" text-anchor="middle" font-size="10" fill="' + colors.muted + '">' + label + '</text>');
+  }
+  
+  return '<svg width="100%" viewBox="0 0 ' + svgW + ' ' + (H + LH + TOPH) +
+    '" style="display:block;margin:14px 0 6px">' +
+    '<g transform="translate(0,' + TOPH + ')">' + bars.join('') + '</g></svg>';
+}
+
+// ─── Weekly Chart (Last 7 Days) ───────────────────────────────────
 
 export function buildWeekChart(sessions) {
   var W = 7, BW = 28, GAP = 8, H = 56, LH = 18, TOPH = 16;
   var svgW = W * (BW + GAP) - GAP;
-  var cs = getComputedStyle(document.documentElement);
-  var accent = cs.getPropertyValue('--accent').trim() || '#88c0d0';
-  var muted = cs.getPropertyValue('--muted').trim() || '#7b8fa1';
-  var border = cs.getPropertyValue('--border').trim() || '#2e3a4e';
+  var colors = getChartColors();
 
   var dayMins = {}, days = [];
   for (var i = W - 1; i >= 0; i--) {
@@ -109,7 +140,7 @@ export function buildWeekChart(sessions) {
     var mins = dayMins[day.key];
     var bh = mins > 0 ? Math.max(4, Math.round((mins / maxM) * H)) : 2;
     var x = i * (BW + GAP);
-    var fill = mins > 0 ? accent : border;
+    var fill = mins > 0 ? colors.accent : colors.border;
     var op = day.key === todayKey ? '1' : '0.65';
 
     var barRect = '<rect x="' + x + '" y="' + (H - bh) + '" width="' + BW +
@@ -118,12 +149,12 @@ export function buildWeekChart(sessions) {
 
     var minLabel = mins > 0
       ? '<text x="' + (x + BW / 2) + '" y="' + (H - bh - 4) +
-        '" text-anchor="middle" font-size="9" fill="' + accent +
+        '" text-anchor="middle" font-size="9" fill="' + colors.accent +
         '" opacity="' + op + '">' + mins + '</text>'
       : '';
 
     var dayLabel = '<text x="' + (x + BW / 2) + '" y="' + (H + LH - 2) +
-      '" text-anchor="middle" font-size="10" fill="' + muted + '">' + day.label + '</text>';
+      '" text-anchor="middle" font-size="10" fill="' + colors.muted + '">' + day.label + '</text>';
 
     return barRect + minLabel + dayLabel;
   }).join('');
@@ -131,6 +162,99 @@ export function buildWeekChart(sessions) {
   return '<svg width="100%" viewBox="0 0 ' + svgW + ' ' + (H + LH + TOPH) +
     '" style="display:block;margin:14px 0 6px">' +
     '<g transform="translate(0,' + TOPH + ')">' + bars + '</g></svg>';
+}
+
+// ─── Weekday Average Chart (Whole History) ────────────────────────
+
+export function buildWeekdayAverageChart(sessions) {
+  var W = 7, BW = 28, GAP = 8, H = 56, LH = 18, TOPH = 16;
+  var svgW = W * (BW + GAP) - GAP;
+  var colors = getChartColors();
+  
+  var locale = { pl: 'pl-PL', ko: 'ko-KR', en: 'en-GB' }[getCurrentLang()] || 'en-GB';
+  
+  // Initialize weekday data: Monday-first (0=Monday, 6=Sunday)
+  var weekdayData = [];
+  for (var i = 0; i < 7; i++) {
+    weekdayData.push({ total: 0, count: 0, label: '' });
+  }
+  
+  // Set labels (Monday first)
+  var labelDate = new Date(2024, 0, 1); // Jan 1, 2024 was Monday
+  for (var i = 0; i < 7; i++) {
+    var d = new Date(labelDate);
+    d.setDate(d.getDate() + i);
+    weekdayData[i].label = d.toLocaleDateString(locale, { weekday: 'narrow' });
+  }
+  
+  if (!sessions.length) {
+    return buildEmptyChart(svgW, H, LH, TOPH, colors);
+  }
+  
+  // Aggregate data by weekday
+  sessions.forEach(function(s) {
+    if (!s.completed) return;
+    var d = new Date(s.id);
+    var dayIndex = d.getDay(); // 0=Sunday, 1=Monday...
+    // Convert to Monday-first: Monday=0, Sunday=6
+    var mondayFirst = (dayIndex + 6) % 7;
+    weekdayData[mondayFirst].total += s.actual;
+    weekdayData[mondayFirst].count++;
+  });
+  
+  // Calculate averages in minutes
+  var avgMins = weekdayData.map(function(d) {
+    return d.count > 0 ? Math.round(d.total / d.count / 60) : 0;
+  });
+  
+  var maxM = Math.max(1, Math.max.apply(null, avgMins));
+  
+  var bars = avgMins.map(function(mins, i) {
+    var bh = mins > 0 ? Math.max(4, Math.round((mins / maxM) * H)) : 2;
+    var x = i * (BW + GAP);
+    var fill = mins > 0 ? colors.accent : colors.border;
+    var hasData = weekdayData[i].count > 0;
+    var op = hasData ? '0.85' : '0.35';
+
+    var barRect = '<rect x="' + x + '" y="' + (H - bh) + '" width="' + BW +
+      '" height="' + bh + '" rx="3" fill="' + fill + '" opacity="' + op + '">' +
+      '<title>' + (hasData ? weekdayData[i].count + ' sessions, avg: ' : 'No data, ') + 
+      mins + ' min</title></rect>';
+
+    var minLabel = mins > 0
+      ? '<text x="' + (x + BW / 2) + '" y="' + (H - bh - 4) +
+        '" text-anchor="middle" font-size="9" fill="' + colors.accent +
+        '" opacity="' + op + '">' + mins + '</text>'
+      : '';
+
+    var dayLabel = '<text x="' + (x + BW / 2) + '" y="' + (H + LH - 2) +
+      '" text-anchor="middle" font-size="10" fill="' + colors.muted + '">' + 
+      weekdayData[i].label + '</text>';
+
+    return barRect + minLabel + dayLabel;
+  }).join('');
+  
+  // Add "avg" indicator
+  var avgIndicator = '<text x="' + (svgW / 2) + '" y="12" text-anchor="middle" ' +
+    'font-size="10" fill="' + colors.muted + '" opacity="0.7">' //+ 
+    //(t('chart_avg_label') || 'average') + '</text>';
+
+  return '<svg width="100%" viewBox="0 0 ' + svgW + ' ' + (H + LH + TOPH) +
+    '" style="display:block;margin:14px 0 6px">' +
+    '<g transform="translate(0,' + TOPH + ')">' + bars + '</g>' +
+    avgIndicator + '</svg>';
+}
+
+// ─── Chart Mode Management ────────────────────────────────────────
+
+export function setChartMode(mode) {
+  chartMode = mode;
+  localStorage.setItem('log_chart_mode', mode);
+  renderLog();
+}
+
+export function getChartMode() {
+  return chartMode;
 }
 
 // ─── Render Log ───────────────────────────────────────────────────
@@ -162,8 +286,44 @@ export function renderLog() {
       streakHtml + avgDailyHtml;
   }
 
+  // Chart with toggle
   var chartEl = document.getElementById('log-chart');
-  if (chartEl) chartEl.innerHTML = sessions.length ? buildWeekChart(sessions) : '';
+  if (chartEl) {
+    if (!sessions.length) {
+      chartEl.innerHTML = '';
+    } else {
+      var chartHtml = '';
+      var isWeek = chartMode === 'week';
+      var colors = getChartColors();
+      
+      // Toggle buttons
+      chartHtml += '<div class="chart-toggle" style="display:flex;gap:8px;justify-content:center;margin-bottom:8px;">' +
+        '<button class="chart-toggle-btn' + (isWeek ? ' active' : '') + '" data-mode="week" ' +
+        'style="padding:6px 12px;border:1px solid ' + colors.border + ';border-radius:6px;' +
+        'background:' + (isWeek ? colors.accent : 'var(--surface)') + ';' +
+        'color:' + (isWeek ? 'var(--bg)' : 'var(--text)') + ';font-size:0.85rem;' +
+        'cursor:pointer;transition:all 0.2s;-webkit-tap-highlight-color:transparent;">' + 
+        (t('chart_last7') || 'Last 7 days') + '</button>' +
+        '<button class="chart-toggle-btn' + (!isWeek ? ' active' : '') + '" data-mode="average" ' +
+        'style="padding:6px 12px;border:1px solid ' + colors.border + ';border-radius:6px;' +
+        'background:' + (!isWeek ? colors.accent : 'var(--surface)') + ';' +
+        'color:' + (!isWeek ? 'var(--bg)' : 'var(--text)') + ';font-size:0.85rem;' +
+        'cursor:pointer;transition:all 0.2s;-webkit-tap-highlight-color:transparent;">' + 
+        (t('chart_avg_weekday') || 'Avg / weekday') + '</button>' +
+        '</div>';
+      
+      // Chart content
+      chartHtml += isWeek ? buildWeekChart(sessions) : buildWeekdayAverageChart(sessions);
+      chartEl.innerHTML = chartHtml;
+      
+      // Attach toggle handlers
+      chartEl.querySelectorAll('.chart-toggle-btn').forEach(function(btn) {
+        btn.addEventListener('click', function() {
+          setChartMode(btn.dataset.mode);
+        });
+      });
+    }
+  }
 
   var logListEl = document.getElementById('log-list');
   if (logListEl) {

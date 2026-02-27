@@ -46,7 +46,10 @@ const STRINGS = {
     manual_saved:      'Session saved ✓',
     manual_err_dur:    'Please enter a valid duration.',
     log_manual:        '✎ manual',
-    log_avg_daily:     'Avg daily'
+    log_avg_daily:     'Avg daily',
+    chart_last7: 'Last 7 days',
+    chart_avg_weekday: 'Avg / Weekday',
+    chart_avg_label: 'average'
   },
   pl: {
     app_title:         'Dzwon Ciszy',
@@ -93,7 +96,10 @@ const STRINGS = {
     manual_saved:      'Sesja zapisana ✓',
     manual_err_dur:    'Podaj prawidłowy czas trwania.',
     log_manual:        '✎ ręcznie',
-    log_avg_daily:     'Śr. dzienna'
+    log_avg_daily:     'Śr. dzienna',
+    chart_last7: 'Ostatnie 7 dni',
+    chart_avg_weekday: 'Średnia / Dzień Tygodnia',
+    chart_avg_label: 'średnia'
   },
   ko: {
     app_title:         '침묵의 종',
@@ -140,7 +146,10 @@ const STRINGS = {
     manual_saved:      '세션 저장됨 ✓',
     manual_err_dur:    '올바른 시간을 입력하세요.',
     log_manual:        '✎ 수동',
-    log_avg_daily:     '일일 평균'
+    log_avg_daily:     '일일 평균',
+   chart_last7: '최근 7일',
+   chart_avg_weekday: '요일 평균',
+   chart_avg_label: '평균',
   }
 };
 
