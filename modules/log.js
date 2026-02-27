@@ -455,8 +455,14 @@ export function importCSV(file, onSuccess, onError) {
           : true;
         var note = iNote >= 0 ? parts[iNote].trim() : '';
         var dateStr = iDate >= 0 ? parts[iDate].trim() : '';
-        var startStr = iStart >= 0 ? parts[iStart].trim() : '';
-        var id = Date.parse(dateStr + ' ' + startStr) || (Date.now() - (lines.length - i) * 1000);
+        var startStr = iStart >= 0 ? parts[iStart].trim() : '00:00';
+        
+        // Parse date properly - handle various formats
+        var id = parseDateToTimestamp(dateStr, startStr);
+        if (!id || isNaN(id)) {
+          // Fallback: generate timestamp based on row position (older rows = older timestamps)
+          id = Date.now() - (lines.length - i) * 1000;
+        }
 
         imported.push({
           id: id,
@@ -486,6 +492,60 @@ export function importCSV(file, onSuccess, onError) {
     }
   };
   reader.readAsText(file);
+}
+
+// Helper function to parse various date formats to timestamp
+function parseDateToTimestamp(dateStr, timeStr) {
+  if (!dateStr) return null;
+  
+  // Try ISO format first (YYYY-MM-DD)
+  var isoDate = dateStr.match(/^(\d{4})-(\d{2})-(\d{2})$/);
+  if (isoDate) {
+    var timeParts = (timeStr || '00:00').split(':');
+    var hours = parseInt(timeParts[0]) || 0;
+    var mins = parseInt(timeParts[1]) || 0;
+    return new Date(
+      parseInt(isoDate[1]), 
+      parseInt(isoDate[2]) - 1, 
+      parseInt(isoDate[3]),
+      hours,
+      mins
+    ).getTime();
+  }
+  
+  // Try DD/MM/YYYY or DD.MM.YYYY
+  var euroDate = dateStr.match(/^(\d{1,2})[\/\.](\d{1,2})[\/\.](\d{4})$/);
+  if (euroDate) {
+    var timeParts = (timeStr || '00:00').split(':');
+    var hours = parseInt(timeParts[0]) || 0;
+    var mins = parseInt(timeParts[1]) || 0;
+    return new Date(
+      parseInt(euroDate[3]), 
+      parseInt(euroDate[2]) - 1, 
+      parseInt(euroDate[1]),
+      hours,
+      mins
+    ).getTime();
+  }
+  
+  // Try US format MM/DD/YYYY
+  var usDate = dateStr.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})$/);
+  if (usDate) {
+    var timeParts = (timeStr || '00:00').split(':');
+    var hours = parseInt(timeParts[0]) || 0;
+    var mins = parseInt(timeParts[1]) || 0;
+    return new Date(
+      parseInt(usDate[3]), 
+      parseInt(usDate[1]) - 1, 
+      parseInt(usDate[2]),
+      hours,
+      mins
+    ).getTime();
+  }
+  
+  // Fallback to native Date.parse
+  var parsed = Date.parse(dateStr + ' ' + timeStr);
+  return isNaN(parsed) ? null : parsed;
 }
 
 // ─── Manual Session Entry ────────────────────────────────────────
