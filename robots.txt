@@ -1,6 +1,3 @@
-# Block ALL AI crawlers, scrapers, and data harvesters
-# Allow legitimate search engines and social media bots
-
 User-agent: GPTBot
 Disallow: /
 
@@ -113,5 +110,3 @@ Allow: /
 
 User-agent: WhatsApp
 Allow: /
-
-Sitemap: https://jwaseon.neocities.org/sitemap.xml
