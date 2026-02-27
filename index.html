@@ -89,6 +89,19 @@
   <div id="view-log" class="view">
     <h2 data-i18n="nav_log">Log</h2>
     <div id="log-summary"></div>
+    
+    <!-- Chart toggle switch -->
+    <div class="chart-toggle-wrap">
+      <div class="chart-toggle">
+        <button id="chart-mode-week" class="chart-toggle-btn active" data-mode="week">
+          <span data-i18n="chart_last7">Last 7 days</span>
+        </button>
+        <button id="chart-mode-avg" class="chart-toggle-btn" data-mode="average">
+          <span data-i18n="chart_avg_weekday">Avg / weekday</span>
+        </button>
+      </div>
+    </div>
+    
     <div id="log-chart"></div>
 
     <!-- Action buttons directly under chart -->
@@ -190,7 +203,7 @@
   <footer class="footer">
     <div class="container">
       <div class="footer-row">
-        <p>&copy; 2026 Silent Bell - v1.2.0</p>
+        <p>&copy; 2026 Silent Bell - v1.2.1</p>
       </div>
       <div class="footer-row">
         <p>
