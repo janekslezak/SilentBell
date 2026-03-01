@@ -17,6 +17,7 @@ import {
 import { initSettingsRefs, loadSettings, setupSettingsListeners } from './modules/settings.js';
 import { state, loadFromStorage, saveToStorage } from './modules/state.js';
 import { createDragHandler } from './modules/debounced-drag.js';
+import { setupVisibilityHandler, getWakeLockInfo } from './modules/wakelock.js';
 
 // ─── DOM References ──────────────────────────────────────────────
 
@@ -27,16 +28,25 @@ const btnStop = document.getElementById('btn-stop');
 const intervalSelect = document.getElementById('interval-select');
 const displayWrap = document.getElementById('display-wrap');
 
+// Platform detection
+const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent) && !window.MSStream;
+
+// Debug logging
+const DEBUG = true;
+function log(...args) {
+  if (DEBUG) console.log('[App]', ...args);
+}
+
 // ─── Service Worker Registration ─────────────────────────────────
 
 if ('serviceWorker' in navigator) {
   window.addEventListener('load', () => {
     navigator.serviceWorker.register('sw.js')
       .then(registration => {
-        console.log('SW registered:', registration.scope);
+        log('SW registered:', registration.scope);
       })
       .catch(error => {
-        console.log('SW registration failed:', error);
+        log('SW registration failed:', error);
       });
   });
 }
@@ -102,8 +112,11 @@ document.getElementById('display-down')?.addEventListener('click', (e) => {
 
 btnStart?.addEventListener('click', async () => {
   try {
-    // Unlock audio context first
+    log('Start button clicked');
+    
+    // Unlock audio context first (critical for iOS)
     await unlockAudio();
+    log('Audio unlocked');
     
     btnStart.disabled = true;
     statusEl.textContent = t('status_ready');
@@ -123,7 +136,7 @@ btnStart?.addEventListener('click', async () => {
       startSession(display, statusEl, btnStart, btnStop, intervalSelect?.value);
     });
   } catch (error) {
-    console.warn('Start session failed:', error);
+    log('Start session failed:', error);
     statusEl.textContent = t('status_error') || 'Error starting session';
     btnStart.disabled = false;
   }
@@ -244,8 +257,10 @@ document.getElementById('btn-clear-log')?.addEventListener('click', () => {
 // ─── Test Sound ───────────────────────────────────────────────────
 
 document.getElementById('btn-test-sound')?.addEventListener('click', async () => {
+  log('Test sound clicked');
   await unlockAudio();
   const type = document.getElementById('settings-sound')?.value;
+  log('Playing test sound:', type);
   
   if (type === 'chugpi') {
     playStrokes('chugpi', 1);
@@ -296,9 +311,40 @@ document.addEventListener('keydown', (e) => {
   }
 });
 
+// ─── iOS-Specific Setup ──────────────────────────────────────────
+
+if (isIOS) {
+  log('iOS detected, setting up handlers');
+  
+  // Setup visibility handler for iOS wake lock reacquisition
+  setupVisibilityHandler();
+  
+  // Handle iOS-specific page lifecycle
+  window.addEventListener('pagehide', () => {
+    log('Page hide - maintaining audio session');
+  });
+  
+  window.addEventListener('pageshow', () => {
+    log('Page show - checking audio session');
+  });
+}
+
+// ─── Debug Helpers (development only) ────────────────────────────
+
+if (typeof window !== 'undefined') {
+  window.SilentBell = {
+    getWakeLockInfo,
+    isTimerRunning,
+    saveToStorage,
+    loadFromStorage
+  };
+}
+
 // ─── Initialization ──────────────────────────────────────────────
 
 function init() {
+  log('Initializing Silent Bell...');
+  
   initI18n();
   loadFromStorage();
   initSettingsRefs();
@@ -307,7 +353,8 @@ function init() {
   initDragHandler();
   saveToStorage();
   
-  console.log('Silent Bell initialized');
+  log('Silent Bell initialized');
+  log('Platform:', isIOS ? 'iOS' : 'Other');
 }
 
 if (document.readyState === 'loading') {

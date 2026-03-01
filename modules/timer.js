@@ -7,6 +7,7 @@ import { playSound, playStrokes, playChugpiNow, getChugpiMaster, playTempleBell,
 import { stopSilentLoop } from './silent-loop.js';
 import { saveSession, showNoteField } from './log.js';
 import { state, set, get } from './state.js';
+import { acquireWakeLock, releaseWakeLock, isWakeLockActive, startAudioKeepalive, stopAudioKeepalive, setupIOSStandaloneHandler } from './wakelock.js';
 
 let timerInterval = null;
 let countdownInterval = null;
@@ -15,6 +16,18 @@ let endTimestamp = null;
 let plannedDuration = 0;
 let intervalBellMs = 0;
 let nextIntervalAt = null;
+
+// Platform detection
+const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent) && !window.MSStream;
+
+// Debug logging
+const DEBUG = true;
+function log(...args) {
+  if (DEBUG) console.log('[Timer]', ...args);
+}
+
+// Initialize iOS standalone handler
+setupIOSStandaloneHandler();
 
 // Get timer state for external access
 export function getTimerState() {
@@ -152,17 +165,32 @@ export function clearCountdown() {
 
 // ─── Session Management ──────────────────────────────────────────
 
-export function startSession(displayEl, statusEl, btnStart, btnStop, intervalSelectValue) {
+export async function startSession(displayEl, statusEl, btnStart, btnStop, intervalSelectValue) {
   intervalBellMs = parseInt(intervalSelectValue, 10) * 60 * 1000 || 0;
   plannedDuration = getTotalSeconds();
   sessionStart = Date.now();
   endTimestamp = sessionStart + plannedDuration * 1000;
   nextIntervalAt = intervalBellMs > 0 ? sessionStart + intervalBellMs : null;
   
+  log('Starting session, duration:', plannedDuration, 'seconds');
+  
   // Ensure audio context is ready
-  ensureAudioContext().catch(err => {
-    console.warn('Audio context ensure failed:', err);
-  });
+  await ensureAudioContext();
+  
+  // Acquire wake lock (critical for iOS screen-off audio)
+  try {
+    const method = await acquireWakeLock();
+    log('Wake lock acquired:', method);
+  } catch (err) {
+    log('Wake lock failed:', err.message);
+  }
+  
+  // Start audio keepalive for iOS (maintains audio context when screen off)
+  if (isIOS) {
+    const ctx = getAudioContext();
+    startAudioKeepalive(ctx);
+    log('iOS audio keepalive started');
+  }
   
   // Play start sound
   const currentSound = get('audio.currentSound') || 'bell';
@@ -174,7 +202,7 @@ export function startSession(displayEl, statusEl, btnStart, btnStop, intervalSel
       playStrokes(currentSound, 1);
     }
   } catch (error) {
-    console.warn('Start sound failed:', error);
+    log('Start sound failed:', error.message);
   }
   
   // Update UI
@@ -206,7 +234,7 @@ function tick(displayEl, statusEl, btnStart, btnStop) {
     try {
       playSound(currentSound);
     } catch (error) {
-      console.warn('Interval bell failed:', error);
+      log('Interval bell failed:', error.message);
     }
     
     nextIntervalAt += intervalBellMs;
@@ -227,6 +255,12 @@ function completeSession(displayEl, statusEl, btnStart, btnStop) {
   timerInterval = null;
   
   setMeditating(false);
+  
+  // Release wake lock
+  releaseWakeLock().catch(() => {});
+  
+  // Stop audio keepalive
+  stopAudioKeepalive();
   
   // Play ending sounds
   const currentSound = get('audio.currentSound') || 'bell';
@@ -268,7 +302,7 @@ function completeSession(displayEl, statusEl, btnStart, btnStop) {
       doEnding(); 
     }
   } catch (error) {
-    console.warn('Ending sounds failed:', error);
+    log('Ending sounds failed:', error.message);
     stopSilentLoop();
   }
   
@@ -298,6 +332,8 @@ export function stopSession(displayEl, statusEl, btnStart, btnStop) {
     clearInterval(countdownInterval);
     countdownInterval = null;
     
+    releaseWakeLock().catch(() => {});
+    stopAudioKeepalive();
     stopSilentLoop();
     
     if (statusEl) statusEl.textContent = t('status_ready');
@@ -314,6 +350,12 @@ export function stopSession(displayEl, statusEl, btnStart, btnStop) {
   timerInterval = null;
   
   setMeditating(false);
+  
+  // Release wake lock
+  releaseWakeLock().catch(() => {});
+  
+  // Stop audio keepalive
+  stopAudioKeepalive();
   
   stopSilentLoop();
   
