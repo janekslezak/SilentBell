@@ -144,6 +144,42 @@ export function exportCSV() {
   log('CSV exported');
 }
 
+// Parse European date format (DD.MM.YYYY) to ISO format (YYYY-MM-DD)
+function parseDate(dateStr) {
+  if (!dateStr) return null;
+  
+  // Check if already in ISO format (YYYY-MM-DD)
+  if (/^\d{4}-\d{2}-\d{2}$/.test(dateStr)) {
+    return dateStr;
+  }
+  
+  // Try European format (DD.MM.YYYY)
+  const euroMatch = dateStr.match(/^(\d{1,2})\.(\d{1,2})\.(\d{4})$/);
+  if (euroMatch) {
+    const [, day, month, year] = euroMatch;
+    return `${year}-${month.padStart(2, '0')}-${day.padStart(2, '0')}`;
+  }
+  
+  // Try other common formats
+  const usMatch = dateStr.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})$/);
+  if (usMatch) {
+    const [, month, day, year] = usMatch;
+    return `${year}-${month.padStart(2, '0')}-${day.padStart(2, '0')}`;
+  }
+  
+  return dateStr;
+}
+
+// Detect if CSV uses seconds or minutes based on values
+function detectUnit(values) {
+  // If average value is > 200, likely seconds; if < 100, likely minutes
+  const nums = values.map(v => parseInt(v, 10)).filter(n => !isNaN(n) && n > 0);
+  if (nums.length === 0) return 'minutes';
+  
+  const avg = nums.reduce((a, b) => a + b, 0) / nums.length;
+  return avg > 200 ? 'seconds' : 'minutes';
+}
+
 export function importCSV(file, onSuccess, onError) {
   const reader = new FileReader();
   
@@ -157,26 +193,66 @@ export function importCSV(file, onSuccess, onError) {
         return;
       }
       
+      // Parse header to detect format
+      const header = lines[0].toLowerCase();
+      const isOldFormat = header.includes('planned (s)') || header.includes('actual (s)');
+      const usesSeconds = isOldFormat || header.includes('(s)');
+      
+      log('CSV format detected:', isOldFormat ? 'old (seconds)' : 'new (minutes)', 
+          'Header:', header);
+      
       const sessions = getSessions();
       let importedCount = 0;
+      
+      // Collect all planned values to detect unit if ambiguous
+      const allPlanned = [];
+      for (let i = 1; i < lines.length; i++) {
+        const parts = lines[i].split(',');
+        if (parts.length >= 3) {
+          allPlanned.push(parts[2]);
+        }
+      }
+      const unit = usesSeconds ? 'seconds' : detectUnit(allPlanned);
+      log('Detected time unit:', unit);
       
       for (let i = 1; i < lines.length; i++) {
         const parts = lines[i].split(',');
         if (parts.length >= 6) {
-          const session = {
-            date: parts[0],
-            startTime: parts[1],
-            planned: parseInt(parts[2], 10) * 60,
-            actual: parseInt(parts[3], 10) * 60,
-            completed: parts[4] === 'Yes',
-            sound: parts[5],
-            note: parts[6] ? parts[6].replace(/^"|"$/g, '').replace(/""/g, '"') : '',
-            imported: true
-          };
+          const dateStr = parts[0].trim();
+          const timeStr = parts[1].trim();
+          const plannedVal = parseInt(parts[2], 10);
+          const actualVal = parseInt(parts[3], 10);
+          const completedStr = parts[4].trim().toLowerCase();
+          const sound = parts[5].trim();
+          const note = parts[6] ? parts[6].replace(/^"|"$/g, '').replace(/""/g, '"') : '';
           
-          if (session.date && !isNaN(session.planned)) {
+          // Parse date (handle both ISO and European formats)
+          const parsedDate = parseDate(dateStr);
+          
+          // Convert to seconds if needed
+          const planned = unit === 'seconds' ? plannedVal : plannedVal * 60;
+          const actual = unit === 'seconds' ? actualVal : actualVal * 60;
+          
+          // Parse completed status
+          const completed = completedStr === 'true' || completedStr === 'yes';
+          
+          if (parsedDate && !isNaN(planned)) {
+            const session = {
+              date: parsedDate,
+              startTime: timeStr,
+              planned: planned,
+              actual: actual || planned,
+              completed: completed,
+              sound: sound || 'bell',
+              note: note,
+              imported: true
+            };
+            
             sessions.push(session);
             importedCount++;
+            log('Imported session:', session);
+          } else {
+            log('Skipped invalid row:', parts);
           }
         }
       }
@@ -185,6 +261,7 @@ export function importCSV(file, onSuccess, onError) {
       onSuccess(importedCount);
       log('CSV imported:', importedCount, 'sessions');
     } catch (error) {
+      log('Import error:', error);
       onError(error.message);
     }
   };
