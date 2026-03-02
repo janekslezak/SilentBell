@@ -2,14 +2,12 @@
 // Provides LocalStorage access with schema versioning,
 // quota error handling, and graceful fallbacks.
 
-// Storage quota information
 const QUOTA_INFO = {
-  estimatedLimit: 5 * 1024 * 1024, // 5MB typical limit
-  warningThreshold: 0.8, // 80%
-  maxItemSize: 1024 * 1024 // 1MB per item
+  estimatedLimit: 5 * 1024 * 1024,
+  warningThreshold: 0.8,
+  maxItemSize: 1024 * 1024
 };
 
-// Custom error types
 export class StorageError extends Error {
   constructor(message, code, details = {}) {
     super(message);
@@ -33,17 +31,15 @@ export class SchemaError extends StorageError {
   }
 }
 
-// Storage class with error handling
 export class Storage {
   constructor(options = {}) {
     this.prefix = options.prefix || 'silentbell_';
     this.schemaVersion = options.schemaVersion || 1;
     this.compressionEnabled = options.compression !== false;
-    this.fallbackStorage = new Map(); // In-memory fallback
+    this.fallbackStorage = new Map();
     this._checkAvailability();
   }
 
-  // Check if localStorage is available
   _checkAvailability() {
     this._available = false;
     this._quotaExceeded = false;
@@ -65,7 +61,6 @@ export class Storage {
     }
   }
 
-  // Check if error is quota-related
   _isQuotaError(error) {
     if (!error) return false;
     
@@ -74,30 +69,26 @@ export class Storage {
       'quotaexceedederror',
       'storage quota',
       'exceeded the quota',
-      '22', // Safari quota error code
-      '1014' // Firefox quota error code
+      '22',
+      '1014'
     ];
     
     const message = (error.message || error.name || '').toLowerCase();
     return quotaMessages.some(qm => message.includes(qm));
   }
 
-  // Get prefixed key
   _key(key) {
     return this.prefix + key;
   }
 
-  // Compress data (simple RLE for repetitive data)
   _compress(data) {
     if (!this.compressionEnabled) return data;
     
     try {
       const json = JSON.stringify(data);
       
-      // Only compress if data is large enough
       if (json.length < 1000) return data;
       
-      // Simple compression for repetitive strings
       let compressed = json;
       const patterns = [
         /"date":"\d{4}-\d{2}-\d{2}"/g,
@@ -132,14 +123,12 @@ export class Storage {
     return data;
   }
 
-  // Decompress data
   _decompress(data) {
     if (!data || !data.__compressed) return data;
     
     try {
       let decompressed = data.data;
       
-      // Reverse token substitution
       for (const [token, value] of Object.entries(data.tokens)) {
         decompressed = decompressed.split(token).join(value);
       }
@@ -151,7 +140,6 @@ export class Storage {
     }
   }
 
-  // Get storage usage estimate
   getUsage() {
     if (!this._available) {
       return { used: 0, total: 0, percent: 0 };
@@ -177,18 +165,15 @@ export class Storage {
     }
   }
 
-  // Check if approaching quota limit
   isNearQuota() {
     const usage = this.getUsage();
     return usage.percent > QUOTA_INFO.warningThreshold;
   }
 
-  // Get item with error handling
   get(key, defaultValue = null) {
     const fullKey = this._key(key);
     
     try {
-      // Try localStorage first
       if (this._available) {
         const value = localStorage.getItem(fullKey);
         if (value !== null) {
@@ -197,7 +182,6 @@ export class Storage {
         }
       }
       
-      // Fall back to memory storage
       if (this.fallbackStorage.has(fullKey)) {
         return this.fallbackStorage.get(fullKey);
       }
@@ -209,7 +193,6 @@ export class Storage {
     }
   }
 
-  // Get raw string value (for migration)
   getRaw(key) {
     const fullKey = this._key(key);
     
@@ -223,7 +206,6 @@ export class Storage {
     return null;
   }
 
-  // Set item with error handling
   set(key, value) {
     const fullKey = this._key(key);
     
@@ -231,7 +213,6 @@ export class Storage {
       const compressed = this._compress(value);
       const serialized = JSON.stringify(compressed);
       
-      // Check item size
       if (serialized.length > QUOTA_INFO.maxItemSize) {
         throw new QuotaExceededError(
           `Item size (${serialized.length}) exceeds maximum (${QUOTA_INFO.maxItemSize})`,
@@ -245,10 +226,8 @@ export class Storage {
           return true;
         } catch (error) {
           if (this._isQuotaError(error)) {
-            // Try to free up space
             this._cleanupOldData();
             
-            // Retry once
             try {
               localStorage.setItem(fullKey, serialized);
               return true;
@@ -262,7 +241,6 @@ export class Storage {
           throw error;
         }
       } else {
-        // Use memory fallback
         this.fallbackStorage.set(fullKey, value);
         return true;
       }
@@ -278,7 +256,6 @@ export class Storage {
     }
   }
 
-  // Remove item
   remove(key) {
     const fullKey = this._key(key);
     
@@ -294,7 +271,6 @@ export class Storage {
     }
   }
 
-  // Clear all items with this prefix
   clear() {
     try {
       if (this._available) {
@@ -317,7 +293,6 @@ export class Storage {
     }
   }
 
-  // Get all keys with this prefix
   keys() {
     const keys = [];
     
@@ -344,10 +319,8 @@ export class Storage {
     return keys;
   }
 
-  // Clean up old data to free space
   _cleanupOldData() {
     try {
-      // Remove legacy keys that are now in state
       const legacyKeys = [
         'settings_duration', 'settings_sound', 'settings_prepare',
         'settings_interval', 'settings_notes', 'lang', 'theme', 'log_chart_mode'
@@ -360,7 +333,6 @@ export class Storage {
         }
       }
       
-      // If still near quota, trim meditation log
       if (this.isNearQuota()) {
         this._trimLogData();
       }
@@ -369,7 +341,6 @@ export class Storage {
     }
   }
 
-  // Trim oldest log entries
   _trimLogData() {
     try {
       const logKey = this._key('meditation_log');
@@ -378,7 +349,6 @@ export class Storage {
       if (logData) {
         const sessions = JSON.parse(logData);
         if (Array.isArray(sessions) && sessions.length > 50) {
-          // Keep only the 50 most recent sessions
           const trimmed = sessions.slice(0, 50);
           localStorage.setItem(logKey, JSON.stringify(trimmed));
         }
@@ -388,7 +358,6 @@ export class Storage {
     }
   }
 
-  // Export all data
   export() {
     const data = {};
     
@@ -403,7 +372,6 @@ export class Storage {
     return data;
   }
 
-  // Import data
   import(data, options = {}) {
     const { merge = false, validate = true } = options;
     
@@ -414,7 +382,6 @@ export class Storage {
       
       for (const [key, value] of Object.entries(data)) {
         if (validate && key === 'app_state' && value.version) {
-          // Validate schema version
           if (value.version > this.schemaVersion) {
             throw new SchemaError(
               `Cannot import data from newer schema version (${value.version} > ${this.schemaVersion})`,
@@ -434,10 +401,8 @@ export class Storage {
   }
 }
 
-// Create default storage instance
 export const storage = new Storage({ schemaVersion: 2 });
 
-// Convenience exports
 export const getItem = (key, defaultValue) => storage.get(key, defaultValue);
 export const setItem = (key, value) => storage.set(key, value);
 export const removeItem = (key) => storage.remove(key);
@@ -445,7 +410,6 @@ export const clearStorage = () => storage.clear();
 export const getStorageUsage = () => storage.getUsage();
 export const isStorageNearQuota = () => storage.isNearQuota();
 
-// Migration helper
 export function migrateFromLegacy() {
   const legacyKeys = {
     'settings_duration': { path: 'settings.duration', type: 'number' },
@@ -470,7 +434,6 @@ export function migrateFromLegacy() {
       
       migrated[config.path] = parsed;
       
-      // Remove legacy key
       try {
         localStorage.removeItem(storage._key(legacyKey));
       } catch (e) {}

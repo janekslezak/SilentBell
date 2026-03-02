@@ -1,572 +1,734 @@
-/* ── Themes ── */
-:root,
-[data-theme="dark"] {
+/* ─── Silent Bell - Main Stylesheet ─────────────────────────────── */
+
+:root {
   --bg: #111820;
-  --surface: #1a2232;
-  --accent: #88c0d0;
-  --text: #eceff4;
-  --muted: #7b8fa1;
-  --danger: #bf616a;
-  --border: #2e3a4e;
+  --surface: #1a232e;
+  --text: #e8e4dc;
+  --muted: #8a8a8a;
+  --accent: #c9a86c;
+  --border: #2a3544;
   --radius: 12px;
-  --saved-color: #88c0d0;
-  --monk-color: #3a5a6a;
 }
 
 [data-theme="light"] {
   --bg: #f0ece4;
   --surface: #ffffff;
-  --accent: #4a7c8e;
-  --text: #2e3440;
-  --muted: #7b8fa1;
-  --danger: #bf616a;
-  --border: #d0c8be;
-  --saved-color: #4a7c8e;
-  --monk-color: #c4b8ae;
+  --text: #2a2a2a;
+  --muted: #666666;
+  --accent: #8b7355;
+  --border: #d0ccc4;
 }
 
-* { box-sizing: border-box; margin: 0; padding: 0; }
+* {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+html {
+  font-size: 16px;
+  -webkit-text-size-adjust: 100%;
+}
 
 body {
-  font-family: system-ui, -apple-system, sans-serif;
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, sans-serif;
   background: var(--bg);
   color: var(--text);
   min-height: 100vh;
   display: flex;
   flex-direction: column;
-  max-width: 480px;
-  margin: 0 auto;
+  line-height: 1.5;
   padding-bottom: 32px;
-  position: relative;
-  transition: background 0.3s, color 0.3s;
 }
 
-/* ── Header ── */
+/* Header */
 header {
   display: flex;
-  align-items: center;
   justify-content: space-between;
-  padding: 12px 16px 10px;
-  background: var(--bg);
-  position: sticky;
-  top: 0;
-  z-index: 20;
+  align-items: center;
+  padding: 12px 16px;
+  background: var(--surface);
   border-bottom: 1px solid var(--border);
-  transition: background 0.3s;
 }
 
-.header-left { display: flex; align-items: center; gap: 10px; }
+.header-left {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
 
-.header-icon { width: 32px; height: 32px; border-radius: 6px; object-fit: cover; }
+.header-icon {
+  width: 32px;
+  height: 32px;
+  border-radius: 6px;
+}
 
 .header-title {
-  font-size: 1.05rem;
-  font-weight: 400;
-  color: var(--text);
-  letter-spacing: 1px;
-  transition: color 0.3s;
+  font-size: 1.1rem;
+  font-weight: 600;
+  color: var(--accent);
 }
 
-.header-controls { display: flex; gap: 8px; }
+.header-controls {
+  display: flex;
+  gap: 8px;
+}
 
-.header-controls button {
-  padding: 6px 12px;
-  background: var(--surface);
+.btn-lang, #btn-theme {
+  background: transparent;
   border: 1px solid var(--border);
-  border-radius: 8px;
   color: var(--text);
-  font-size: 0.85rem;
+  padding: 6px 10px;
+  border-radius: 6px;
   cursor: pointer;
-  touch-action: manipulation;
-  -webkit-tap-highlight-color: transparent;
-  transition: background 0.2s, color 0.2s;
+  font-size: 0.85rem;
+  transition: all 0.2s;
 }
 
-/* ── Nav ── */
+.btn-lang:hover, #btn-theme:hover {
+  border-color: var(--accent);
+  color: var(--accent);
+}
+
+/* Navigation */
 nav {
   display: flex;
+  justify-content: center;
+  gap: 8px;
+  padding: 12px;
   background: var(--surface);
   border-bottom: 1px solid var(--border);
   position: sticky;
   top: 57px;
   z-index: 10;
-  transition: background 0.3s;
 }
 
 .nav-btn {
-  flex: 1;
-  padding: 14px 8px;
-  background: none;
+  background: transparent;
   border: none;
-  border-bottom: 2px solid transparent;
   color: var(--muted);
-  font-size: 0.9rem;
+  padding: 8px 16px;
+  border-radius: 20px;
   cursor: pointer;
-  -webkit-tap-highlight-color: transparent;
-  touch-action: manipulation;
-  transition: color 0.2s;
+  font-size: 0.9rem;
+  transition: all 0.2s;
 }
 
-.nav-btn.active { color: var(--accent); border-bottom: 2px solid var(--accent); }
+.nav-btn:hover {
+  color: var(--text);
+}
 
-/* ── Views ── */
+.nav-btn.active {
+  background: var(--accent);
+  color: var(--bg);
+}
+
+/* Views */
 .view {
   display: none;
-  padding: 24px 20px;
-  flex-direction: column;
-  gap: 16px;
-  position: relative;
-  z-index: 1;
+  flex: 1;
+  padding: 20px 16px;
+  max-width: 600px;
+  margin: 0 auto;
+  width: 100%;
 }
 
-.view.active { display: flex; }
+.view.active {
+  display: block;
+}
 
-/* ── Timer display + arrows ── */
+/* Timer Display */
 #display-wrap {
   display: flex;
-  flex-direction: row;
+  flex-direction: column;
   align-items: center;
-  justify-content: center;
-  gap: 6px;
-  margin: 16px 0 4px;
+  margin: 40px 0 20px;
+  cursor: grab;
   user-select: none;
-  touch-action: none;
+  touch-action: pan-y;
+}
+
+#display-wrap:active {
+  cursor: grabbing;
 }
 
 #display {
   font-size: 5rem;
-  font-weight: 200;
-  letter-spacing: 4px;
-  color: var(--accent);
+  font-weight: 300;
   font-variant-numeric: tabular-nums;
-  line-height: 1;
-  transition: color 0.3s;
+  color: var(--accent);
+  letter-spacing: -2px;
 }
 
 #display-arrows {
   display: flex;
-  flex-direction: column;
-  gap: 2px;
-  align-self: center;
-}
-
-#display-up,
-#display-down {
-  display: block;
-  background: none;
-  border: none;
-  color: var(--muted);
-  font-size: 0.85rem;
-  cursor: pointer;
-  padding: 3px 7px;
-  line-height: 1;
-  touch-action: manipulation;
-  -webkit-tap-highlight-color: transparent;
-  transition: color 0.15s;
-}
-
-#display-up:hover,
-#display-down:hover { color: var(--accent); }
-
-#status { text-align: center; color: var(--muted); font-size: 0.9rem; }
-
-/* ── Field groups ── */
-.field-group { display: flex; flex-direction: column; gap: 6px; }
-
-.field-label { font-size: 0.85rem; color: var(--muted); padding-left: 2px; }
-
-/* ── Inputs & Selects ── */
-input[type="number"],
-input[type="date"],
-input[type="time"],
-select {
-  width: 100%;
-  padding: 13px 14px;
-  background: var(--surface);
-  border: 1px solid var(--border);
-  border-radius: var(--radius);
-  color: var(--text);
-  font-size: 1rem;
-  font-family: inherit;
-  -webkit-appearance: none;
-  appearance: none;
-  cursor: pointer;
-  touch-action: manipulation;
-  transition: background 0.3s, color 0.3s, border-color 0.3s;
-}
-
-/* ── Sound row ── */
-.sound-row {
-  display: flex;
-  gap: 8px;
-  align-items: center;
-}
-
-.sound-row select { flex: 1; }
-
-#btn-test-sound {
-  flex-shrink: 0;
-  padding: 13px 18px;
-  background: var(--surface);
-  border: 1px solid var(--border);
-  border-radius: var(--radius);
-  color: var(--accent);
-  font-size: 1rem;
-  cursor: pointer;
-  touch-action: manipulation;
-  -webkit-tap-highlight-color: transparent;
-  transition: border-color 0.15s, color 0.15s;
-}
-
-#btn-test-sound:hover { border-color: var(--accent); }
-
-/* ── Lotus figure — hidden by default ── */
-.lotus-figure {
-  display: none;
-  justify-content: center;
-  align-items: center;
-}
-
-.lotus-svg {
-  width: 150px;
-  height: auto;
-  color: var(--accent);
-  opacity: 0.75;
-  transition: color 0.3s, opacity 0.3s;
-}
-
-/* ── Controls ── */
-.controls {
-  display: flex;
-  gap: 12px;
-  margin-top: 8px;
-}
-
-.controls button {
-  flex: 1;
-  padding: 18px;
-  border: none;
-  border-radius: var(--radius);
-  font-size: 1.1rem;
-  font-family: inherit;
-  cursor: pointer;
-  -webkit-tap-highlight-color: transparent;
-  touch-action: manipulation;
-  transition: opacity 0.15s;
-}
-
-#btn-start { background: var(--accent); color: var(--bg); font-weight: 600; }
-#btn-stop  { background: var(--danger); color: #fff; }
-
-button:disabled { opacity: 0.35; pointer-events: none; }
-
-/* ── Shared text input ── */
-.text-input {
-  width: 100%;
-  padding: 7px 10px;
-  box-sizing: border-box;
-  background: var(--surface);
-  border: 1px solid var(--border);
-  border-radius: var(--radius);
-  color: var(--text);
-  font-size: 15px;
-  font-family: inherit;
-  -webkit-appearance: none;
-  appearance: none;
-}
-
-/* ── Note wrap ── */
-.note-wrap {
-  display: none;
-  flex-direction: column;
-  gap: 6px;
+  gap: 40px;
   margin-top: 10px;
 }
 
-/* ── Accent outline button (note save) ── */
-.btn-accent-outline {
-  width: 100%;
-  padding: 7px 0;
+#display-up, #display-down {
   background: transparent;
-  color: var(--accent);
-  border: 1px solid var(--accent);
-  border-radius: var(--radius);
-  font-size: 0.85rem;
-  font-family: inherit;
-  cursor: pointer;
-  touch-action: manipulation;
-}
-
-/* ── Log ── */
-h2 { font-size: 1.1rem; font-weight: 400; color: var(--accent); }
-
-#log-summary {
-  background: var(--surface);
-  padding: 14px 16px;
-  border-radius: var(--radius);
-  font-size: 0.9rem;
-  line-height: 1.8;
+  border: none;
   color: var(--muted);
-  transition: background 0.3s;
+  font-size: 1.2rem;
+  cursor: pointer;
+  padding: 8px;
+  transition: color 0.2s;
 }
 
-#log-list { list-style: none; display: flex; flex-direction: column; gap: 10px; }
-
-#log-list li {
-  background: var(--surface);
-  padding: 12px 14px;
-  border-radius: var(--radius);
-  font-size: 0.88rem;
-  line-height: 1.7;
-  transition: background 0.3s;
-}
-
-.log-date   { color: var(--accent); font-weight: 500; }
-.log-detail { color: var(--muted); }
-
-.log-note {
+#display-up:hover, #display-down:hover {
   color: var(--accent);
-  font-size: 0.82rem;
-  font-style: italic;
-  margin-top: 3px;
 }
 
-/* ── Log actions ── */
-.log-actions {
+/* Status */
+#status {
+  text-align: center;
+  color: var(--muted);
+  font-size: 1rem;
+  margin-bottom: 30px;
+  min-height: 24px;
+}
+
+/* Controls */
+.controls {
   display: flex;
-  flex-wrap: wrap;
-  gap: 10px;
   justify-content: center;
+  gap: 16px;
+  margin-bottom: 30px;
 }
 
-.log-actions--center {
-  justify-content: center;
+#btn-start, #btn-stop {
+  padding: 14px 40px;
+  border-radius: var(--radius);
+  font-size: 1.1rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s;
+  border: none;
 }
 
-/* ── Secondary buttons ── */
-#btn-export,
-#btn-import-csv,
-#btn-clear-log,
-#btn-manual-log {
-  flex: 1 1 130px;           /* ← moved here, wins over old rules */
-  padding: 14px;
+#btn-start {
+  background: var(--accent);
+  color: var(--bg);
+}
+
+#btn-start:hover:not(:disabled) {
+  opacity: 0.9;
+  transform: translateY(-1px);
+}
+
+#btn-stop {
+  background: var(--surface);
+  color: var(--text);
+  border: 1px solid var(--border);
+}
+
+#btn-stop:hover:not(:disabled) {
+  border-color: #e74c3c;
+  color: #e74c3c;
+}
+
+#btn-start:disabled, #btn-stop:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+/* Note Wrap */
+.note-wrap {
+  display: none;
+  flex-direction: column;
+  gap: 12px;
+  max-width: 400px;
+  margin: 0 auto 30px;
+}
+
+#note-input {
+  padding: 12px 16px;
   border: 1px solid var(--border);
   border-radius: var(--radius);
   background: var(--surface);
   color: var(--text);
-  font-size: 0.95rem;
-  font-family: inherit;
+  font-size: 1rem;
+}
+
+#note-input:focus {
+  outline: none;
+  border-color: var(--accent);
+}
+
+.btn-accent-outline {
+  padding: 12px 24px;
+  background: transparent;
+  border: 1px solid var(--accent);
+  color: var(--accent);
+  border-radius: var(--radius);
   cursor: pointer;
-  -webkit-tap-highlight-color: transparent;
-  touch-action: manipulation;
-  transition: background 0.3s, color 0.3s;
+  font-size: 1rem;
+  transition: all 0.2s;
 }
 
-#btn-manual-log { color: var(--accent); border-color: var(--accent); }
-#btn-clear-log  {
-  color: var(--danger);
-  border-color: var(--danger);
-  flex: 0 0 auto;            /* ← Clear Log stays its own width, centered */
-  min-width: 140px;
+.btn-accent-outline:hover {
+  background: var(--accent);
+  color: var(--bg);
 }
 
+/* Lotus Figure */
+.lotus-figure {
+  display: flex;
+  justify-content: center;
+  margin-top: 40px;
+  opacity: 0.6;
+}
 
-#btn-manual-log { color: var(--accent); border-color: var(--accent); }
-#btn-clear-log  { color: var(--danger); border-color: var(--danger); }
+.lotus-svg {
+  width: 120px;
+  height: 96px;
+  color: var(--accent);
+}
 
-/* ── Manual entry form ── */
-.manual-entry {
-  display: none;
-  flex-direction: column;
-  gap: 8px;
-  margin: 4px 0 8px;
-  padding: 12px;
+/* Log View */
+#view-log h2 {
+  text-align: center;
+  margin-bottom: 20px;
+  color: var(--accent);
+}
+
+#log-summary {
+  display: flex;
+  justify-content: center;
+  gap: 30px;
+  margin-bottom: 20px;
+  padding: 16px;
   background: var(--surface);
-  border: 1px solid var(--border);
   border-radius: var(--radius);
 }
 
-.manual-entry-title {
-  font-size: 0.85rem;
+.log-stat {
+  text-align: center;
+}
+
+.log-stat-value {
+  display: block;
+  font-size: 1.8rem;
   font-weight: 600;
   color: var(--accent);
+}
+
+.log-stat-label {
+  font-size: 0.8rem;
+  color: var(--muted);
+}
+
+#log-chart {
+  margin-bottom: 20px;
+  padding: 16px;
+  background: var(--surface);
+  border-radius: var(--radius);
+}
+
+.chart-title {
+  text-align: center;
+  font-size: 0.9rem;
+  color: var(--muted);
+  margin-bottom: 12px;
+}
+
+.chart-bars {
+  display: flex;
+  justify-content: space-around;
+  align-items: flex-end;
+  height: 100px;
+  gap: 8px;
+}
+
+.chart-bar-wrapper {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+}
+
+.chart-bar {
+  width: 100%;
+  background: var(--accent);
+  border-radius: 4px 4px 0 0;
+  min-height: 4px;
+  transition: height 0.3s;
+}
+
+.chart-bar-label {
+  font-size: 0.7rem;
+  color: var(--muted);
+}
+
+.chart-bar-value {
+  font-size: 0.7rem;
+  color: var(--accent);
+}
+
+/* Log Actions */
+.log-actions {
+  display: flex;
+  justify-content: center;
+  gap: 10px;
+  margin-bottom: 20px;
+  flex-wrap: wrap;
+}
+
+.log-actions--center {
+  margin-top: 20px;
+}
+
+.log-actions button {
+  padding: 10px 16px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  color: var(--text);
+  border-radius: var(--radius);
+  cursor: pointer;
+  font-size: 0.9rem;
+  transition: all 0.2s;
+}
+
+.log-actions button:hover {
+  border-color: var(--accent);
+  color: var(--accent);
+}
+
+/* Manual Entry */
+.manual-entry {
+  display: none;
+  flex-direction: column;
+  gap: 12px;
+  padding: 16px;
+  background: var(--surface);
+  border-radius: var(--radius);
+  margin-bottom: 20px;
+}
+
+.manual-entry-title {
+  text-align: center;
+  color: var(--accent);
+  font-weight: 500;
 }
 
 .manual-entry-row {
   display: flex;
   gap: 8px;
-  flex-wrap: wrap;
 }
 
-.manual-date,
-.manual-time { flex: 1; min-width: 100px; padding: 7px 10px; }
-.manual-duration { width: 72px; padding: 7px 10px; }
-
-.manual-entry-actions { display: flex; gap: 8px; }
-
-/* ── Filled accent button ── */
-.btn-accent {
+.manual-entry-row input {
   flex: 1;
-  padding: 7px 0;
-  background: var(--accent);
-  color: #fff;
-  border: none;
-  border-radius: var(--radius);
-  font-family: inherit;
-  font-size: 0.9rem;
-  cursor: pointer;
-  touch-action: manipulation;
-}
-
-/* ── Ghost button ── */
-.btn-ghost {
-  flex: 1;
-  padding: 7px 0;
-  background: transparent;
-  color: var(--muted);
+  padding: 10px;
   border: 1px solid var(--border);
-  border-radius: var(--radius);
-  font-family: inherit;
-  font-size: 0.9rem;
-  cursor: pointer;
-  touch-action: manipulation;
+  border-radius: 6px;
+  background: var(--bg);
+  color: var(--text);
 }
 
-/* ── Manual log badge ── */
-.log-manual-badge { opacity: 0.6; font-size: 0.8em; }
-
-/* ── Settings rows ── */
-.setting-row {
+.manual-entry-actions {
   display: flex;
-  align-items: center;
-  gap: 12px;
+  justify-content: center;
+  gap: 10px;
+}
+
+.btn-accent {
+  padding: 10px 24px;
+  background: var(--accent);
+  color: var(--bg);
+  border: none;
+  border-radius: 6px;
+  cursor: pointer;
+  font-weight: 500;
+}
+
+.btn-ghost {
+  padding: 10px 16px;
+  background: transparent;
+  border: 1px solid var(--border);
+  color: var(--muted);
+  border-radius: 6px;
+  cursor: pointer;
+}
+
+/* Log List */
+#log-list {
+  list-style: none;
+}
+
+.log-item {
+  padding: 12px 16px;
   background: var(--surface);
-  padding: 14px 16px;
   border-radius: var(--radius);
-  transition: background 0.3s;
+  margin-bottom: 8px;
 }
 
-.setting-row label {
-  flex: 1;
-  font-size: 0.9rem;
+.log-item-header {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 4px;
+  font-size: 0.85rem;
+}
+
+.log-date {
+  color: var(--accent);
+}
+
+.log-time {
   color: var(--muted);
-  cursor: default;
 }
 
-.setting-row select,
-.setting-row input[type="number"] {
-  width: auto;
-  flex-shrink: 0;
-  min-width: 100px;
-  padding: 8px 12px;
-  font-size: 0.95rem;
+.log-badge {
+  font-size: 0.7rem;
+  padding: 2px 6px;
+  background: var(--border);
+  border-radius: 4px;
+  color: var(--muted);
 }
 
-/* ── Meditation active state ── */
-#view-timer.meditating {
+.log-item-body {
+  display: flex;
+  gap: 12px;
   align-items: center;
-  justify-content: flex-start;
-  min-height: calc(100vh - 120px);
-  gap: 16px;
-  padding-top: 32px;
-  flex-direction: column;
 }
 
-#view-timer.meditating .lotus-figure { order: 1; display: flex; }
-#view-timer.meditating #display-wrap { order: 2; margin: 0; }
-#view-timer.meditating #status       { order: 3; }
-#view-timer.meditating .controls     { order: 4; }
-#view-timer.meditating #note-wrap    { order: 5; }
-
-#view-timer.meditating #display-arrows { display: none; }
-
-#view-timer.meditating .lotus-svg {
-  animation: lotus-pulse 4s ease-in-out infinite;
+.log-duration {
+  font-weight: 500;
 }
 
-@keyframes lotus-pulse {
-  0%, 100% { opacity: 0.75; transform: scale(1);    }
-  50%       { opacity: 0.35; transform: scale(0.96); }
+.log-sound {
+  color: var(--muted);
+  font-size: 0.85rem;
 }
 
-#view-timer.meditating .controls {
-  flex-direction: column;
-  align-items: center;
-  margin-top: 0;
-}
-
-#view-timer.meditating #btn-start { display: none; }
-
-#view-timer.meditating #btn-stop {
-  width: 200px;
-  flex: none;
-  padding: 16px 0;
-}
-
-/* ── Small screens ── */
-@media (max-width: 375px) {
-  #display         { font-size: 4rem; }
-  .controls button { padding: 16px; font-size: 1rem; }
-  .lotus-svg       { width: 120px; }
-}
-
-/* ── Footer ── */
-footer {
-  text-align: center;
-  padding: 16px 20px 8px;
+.log-stopped {
+  color: #e74c3c;
   font-size: 0.8rem;
-  color: var(--muted);
 }
 
-footer a {
+.log-note {
+  margin-top: 8px;
+  padding-top: 8px;
+  border-top: 1px solid var(--border);
+  font-size: 0.85rem;
   color: var(--muted);
-  text-decoration: underline;
-  text-underline-offset: 3px;
+  font-style: italic;
 }
 
-/* ── iOS Install Banner ── */
+/* Settings View */
+#view-settings h2 {
+  text-align: center;
+  margin-bottom: 24px;
+  color: var(--accent);
+}
+
+.field-group {
+  margin-bottom: 20px;
+  padding: 16px;
+  background: var(--surface);
+  border-radius: var(--radius);
+}
+
+.field-label {
+  display: block;
+  margin-bottom: 8px;
+  color: var(--muted);
+  font-size: 0.9rem;
+}
+
+.field-group input,
+.field-group select {
+  width: 100%;
+  padding: 12px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: var(--bg);
+  color: var(--text);
+  font-size: 1rem;
+}
+
+.field-group input:focus,
+.field-group select:focus {
+  outline: none;
+  border-color: var(--accent);
+}
+
+.sound-row {
+  display: flex;
+  gap: 10px;
+}
+
+.sound-row select {
+  flex: 1;
+}
+
+#btn-test-sound {
+  padding: 12px 16px;
+  background: var(--accent);
+  color: var(--bg);
+  border: none;
+  border-radius: 6px;
+  cursor: pointer;
+  font-size: 1rem;
+}
+
+/* iOS Install Banner */
 #ios-install-banner {
-  display: none;  /* shown only by JS on eligible iOS devices */
   position: fixed;
   bottom: 20px;
-  left: 50%;
-  transform: translateX(-50%);
-  width: calc(100% - 40px);
-  max-width: 440px;
+  left: 16px;
+  right: 16px;
   background: var(--surface);
   border: 1px solid var(--accent);
   border-radius: var(--radius);
-  padding: 14px 16px;
-  align-items: center;
+  padding: 12px 16px;
+  display: flex;
   justify-content: space-between;
-  gap: 12px;
-  font-size: 0.88rem;
-  color: var(--text);
+  align-items: center;
   z-index: 100;
-  box-shadow: 0 4px 24px rgba(0,0,0,0.35);
 }
 
-#ios-install-text { flex: 1; line-height: 1.5; }
+#ios-install-text {
+  font-size: 0.85rem;
+  color: var(--text);
+}
 
 #ios-install-close {
   background: none;
   border: none;
   color: var(--muted);
-  font-size: 1rem;
+  font-size: 1.2rem;
   cursor: pointer;
-  padding: 4px 6px;
-  flex-shrink: 0;
+  padding: 4px;
 }
 
-/* Chart toggle buttons */
-.chart-toggle-btn {
-  transition: all 0.2s ease;
+/* iOS Loading Screen */
+#ios-loading-screen {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: var(--bg);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 9999;
+  transition: opacity 0.5s ease, visibility 0.5s ease;
 }
 
-.chart-toggle-btn:hover {
-  border-color: var(--accent);
+#ios-loading-screen.hidden {
+  opacity: 0;
+  visibility: hidden;
+  pointer-events: none;
 }
 
-.chart-toggle-btn.active {
-  font-weight: 500;
+.ios-loading-content {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 24px;
+}
+
+.ios-loading-icon {
+  width: 120px;
+  height: 120px;
+  border-radius: 24px;
+  object-fit: cover;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
+}
+
+.ios-loading-spinner {
+  width: 40px;
+  height: 40px;
+  border: 3px solid var(--border);
+  border-top-color: var(--accent);
+  border-radius: 50%;
+  animation: ios-spinner 1s linear infinite;
+}
+
+@keyframes ios-spinner {
+  to { transform: rotate(360deg); }
+}
+
+.ios-loading-text {
+  font-size: 1.2rem;
+  color: var(--accent);
+  letter-spacing: 2px;
+  font-weight: 300;
+}
+
+/* Footer */
+.footer {
+  margin-top: auto;
+  padding: 20px;
+  text-align: center;
+  border-top: 1px solid var(--border);
+}
+
+.footer-row {
+  margin-bottom: 8px;
+  font-size: 0.8rem;
+  color: var(--muted);
+}
+
+.footer a {
+  color: var(--accent);
+  text-decoration: none;
+}
+
+.footer a:hover {
+  text-decoration: underline;
+}
+
+/* Safe Area Support for Notched Devices */
+@supports (padding-top: env(safe-area-inset-top)) {
+  body {
+    padding-top: env(safe-area-inset-top);
+    padding-bottom: calc(32px + env(safe-area-inset-bottom));
+  }
+  
+  header {
+    padding-top: calc(12px + env(safe-area-inset-top));
+  }
+  
+  nav {
+    top: calc(57px + env(safe-area-inset-top));
+  }
+  
+  #ios-install-banner {
+    bottom: calc(20px + env(safe-area-inset-bottom));
+  }
+}
+
+/* Responsive */
+@media (max-width: 480px) {
+  #display {
+    font-size: 4rem;
+  }
+  
+  #btn-start, #btn-stop {
+    padding: 12px 30px;
+    font-size: 1rem;
+  }
+  
+  .log-actions {
+    flex-direction: column;
+  }
+  
+  .log-actions button {
+    width: 100%;
+  }
+}
+
+/* Reduced Motion */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
 }

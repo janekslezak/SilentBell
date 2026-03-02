@@ -3,7 +3,6 @@
 
 import { state, set, get } from './state.js';
 
-// Translation strings
 const STRINGS = {
   en: {
     app_title:         'Silent Bell',
@@ -178,20 +177,16 @@ const STRINGS = {
   }
 };
 
-// Current language and theme
 let currentLang = 'en';
 let currentTheme = 'dark';
 
-// Initialize from state or legacy storage
 function initFromStorage() {
-  // Try central state first
   const stateLang = get('settings.language');
   const stateTheme = get('settings.theme');
   
   if (stateLang && STRINGS[stateLang]) {
     currentLang = stateLang;
   } else {
-    // Fallback to legacy localStorage
     const legacyLang = localStorage.getItem('lang');
     if (legacyLang && STRINGS[legacyLang]) {
       currentLang = legacyLang;
@@ -201,7 +196,6 @@ function initFromStorage() {
   if (stateTheme) {
     currentTheme = stateTheme;
   } else {
-    // Fallback to legacy localStorage
     const legacyTheme = localStorage.getItem('theme');
     if (legacyTheme) {
       currentTheme = legacyTheme;
@@ -209,13 +203,11 @@ function initFromStorage() {
   }
 }
 
-// Translate function
 export function t(key, replacements = {}) {
   let text = (STRINGS[currentLang] && STRINGS[currentLang][key])
       || (STRINGS['en'] && STRINGS['en'][key])
       || key;
   
-  // Replace placeholders
   for (const [placeholder, value] of Object.entries(replacements)) {
     text = text.replace(`{${placeholder}}`, value);
   }
@@ -223,7 +215,6 @@ export function t(key, replacements = {}) {
   return text;
 }
 
-// Getters
 export function getCurrentLang() { return currentLang; }
 
 export function setCurrentLang(lang) { 
@@ -244,7 +235,6 @@ export function setCurrentTheme(theme) {
   }
 }
 
-// Apply language to DOM
 export function applyLang() {
   document.documentElement.lang = currentLang;
   
@@ -262,7 +252,6 @@ export function applyLang() {
     }
   });
   
-  // Update language buttons
   const allLangs = ['en', 'pl', 'ko'];
   const otherLangs = allLangs.filter(l => l !== currentLang);
   const langDisplay = { en: 'EN', pl: 'PL', ko: '한' };
@@ -275,7 +264,6 @@ export function applyLang() {
   });
 }
 
-// Apply theme to DOM
 export function applyTheme() {
   document.documentElement.setAttribute('data-theme', currentTheme);
   
@@ -290,16 +278,12 @@ export function applyTheme() {
   }
 }
 
-// Initialize i18n
 export function initI18n() {
-  // Load from storage
   initFromStorage();
   
-  // Apply to DOM
   applyLang();
   applyTheme();
   
-  // Setup language buttons
   document.querySelectorAll('.btn-lang').forEach(btn => {
     btn.addEventListener('click', () => {
       const newLang = btn.dataset.lang;
@@ -312,7 +296,6 @@ export function initI18n() {
     });
   });
   
-  // Setup theme button
   const btnTheme = document.getElementById('btn-theme');
   if (btnTheme) {
     btnTheme.addEventListener('click', () => {
@@ -324,17 +307,14 @@ export function initI18n() {
   }
 }
 
-// Get available languages
 export function getAvailableLanguages() {
   return Object.keys(STRINGS);
 }
 
-// Check if translation exists
 export function hasTranslation(key, lang = currentLang) {
   return !!(STRINGS[lang] && STRINGS[lang][key]);
 }
 
-// Add custom translations (for extensions)
 export function addTranslations(lang, translations) {
   if (!STRINGS[lang]) {
     STRINGS[lang] = {};

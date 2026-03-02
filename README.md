@@ -1,52 +1,132 @@
-Silent Bell
+# Silent Bell - PWA Meditation Timer
 
-A lightweight meditation timer with built in log. No accounts, no tracking, no ads.
+A minimalist meditation timer with offline audio support for iOS, Android, and desktop browsers.
 
-  - 225KB – loads instantly, works offline
-  - Private log – your sessions stay on your device
-  - PWA-ready – install on phone or desktop
-  - Open source (MIT)
+## Version 2.2.0
 
-  How to use
-  
-Set the time and hit start. After the session, details are automatically saved to your log. Add a note afterward if you like, or log sessions you did without the app.
-In settings, adjust default duration, sound, interval bells, preparation countdown, and toggle notes on or off.
-In iOS do not manually turn off the screen - it will prevent the sound from ringing at the end of session.
+## Features
 
-  Installation 
-  
-Option 1: Use in browser (quickest)
+- **Timer**: Set custom meditation duration with drag or arrow controls
+- **Sounds**: Choose from Bell, High Bell, or Chugpi (죽비) sounds
+- **Interval Bells**: Optional interval bells during meditation
+- **Preparation Countdown**: Configurable countdown before session starts
+- **Session Log**: Track and export your meditation sessions
+- **Offline Support**: Works without internet connection
+- **PWA**: Install as a standalone app on mobile devices
 
-Open https://jwaseon.netlify.app/ in any modern browser and start meditating immediately. No installation required.
+## Installation
 
-Option 2: Install as app (recommended)
+### iOS (Safari)
+1. Open the app in Safari
+2. Tap the Share button
+3. Select "Add to Home Screen"
+4. The app will appear on your home screen
 
-Silent Bell works as a Progressive Web App—install it once, use it anytime, even offline.
+### Android (Chrome)
+1. Open the app in Chrome
+2. Tap the menu (three dots)
+3. Select "Add to Home Screen"
+4. The app will appear on your home screen
 
- a) iPhone/iPad (Safari):
-      -  Open the site in Safari
-      -  Tap the Share button (rectangle with arrow)
-      -  Scroll down and tap "Add to Home Screen"
-      -  Tap "Add"
- b) Android (Chrome):
-      -  Open the site in Chrome
-      -  Tap the menu (three dots) or look for the install prompt
-      -  Tap "Install" or "Add to Home Screen"
+## File Structure
 
-Once installed, Silent Bell launches like any native app - no browser, no address bar, just the timer.
+```
+silent-bell/
+├── index.html          # Main HTML file
+├── app.js              # Main application entry point
+├── style.css           # Stylesheet
+├── manifest.json       # PWA manifest
+├── sw.js               # Service Worker for offline support
+├── NoSleep.min.js      # Screen wake lock library
+├── icon-192.png        # App icon (192x192)
+├── icon-512.png        # App icon (512x512)
+├── sounds/             # Audio files
+│   ├── sequence_bell_start.mp3
+│   ├── sequence_bell_interval.mp3
+│   ├── sequence_bell_end.mp3
+│   ├── sequence_bell_high_start.mp3
+│   ├── sequence_bell_high_interval.mp3
+│   ├── sequence_bell_high_end.mp3
+│   ├── sequence_chugpi_start.mp3
+│   ├── sequence_chugpi_interval.mp3
+│   ├── sequence_chugpi_end.mp3
+│   ├── chugpi.mp3
+│   ├── temple_bell_standard.mp3
+│   ├── temple_bell_high.mp3
+│   ├── singing_bowl_edge.mp3
+│   └── singing_bowl_edge_high.mp3
+└── modules/            # JavaScript modules
+    ├── state.js        # Central state management
+    ├── storage.js      # LocalStorage wrapper
+    ├── i18n.js         # Internationalization
+    ├── audio-context.js # Audio context management
+    ├── audio.js        # Audio engine (Web Audio + HTML5 Audio)
+    ├── silent-loop.js  # Silent audio loop for locked screen
+    ├── timer.js        # Timer logic
+    ├── wakelock.js     # Screen wake lock
+    ├── log.js          # Session logging
+    ├── settings.js     # Settings management
+    └── debounced-drag.js # Drag handler
+```
 
-  Credits
-  
-Uses NoSleep.min.js to keep your screen awake during sessions:
-https://github.com/richtr/NoSleep.js/blob/master/dist/NoSleep.min.js
+## Audio System
 
-  Feedback & bugs
-  
-I'd be happy to hear from you with all the feedback and bug reports. 
-Open issue, drop me a line or use contact form:
-https://forms.gle/A5zSLUBLg5TKHnk66
+The app uses a hybrid audio system:
 
+- **iOS & Android**: HTML5 Audio with MP3 files for locked-screen playback
+- **Desktop**: Web Audio API for synthesized sounds
 
-Available on & powered by Netlify:
-https://jwaseon.netlify.app/
+## Keyboard Shortcuts
 
+- **Space**: Start/Stop timer
+- **Escape**: Stop timer during session
+
+## Browser Compatibility
+
+- iOS Safari 11+
+- Android Chrome 60+
+- Desktop Chrome, Firefox, Safari, Edge
+
+## Known Limitations
+
+### iOS
+- Audio cannot play if the user manually turns off the screen (iOS system restriction)
+- Screen must stay on (can dim) for audio to work
+
+### Android
+- Some OEM skins may have aggressive battery optimization
+- Users may need to disable battery optimization for the app in system settings
+
+## Development
+
+### Debug Console
+
+Open browser console to see debug logs:
+- `[App]` - Main application logs
+- `[Audio]` - Audio system logs
+- `[Timer]` - Timer logs
+- `[WakeLock]` - Wake lock logs
+- `[SilentLoop]` - Silent loop logs
+
+### Debug Object
+
+```javascript
+window.SilentBell = {
+  getWakeLockInfo(),
+  isTimerRunning(),
+  saveToStorage(),
+  loadFromStorage(),
+  getAudioMode(),
+  preloadSoundSet(type)
+}
+```
+
+## License
+
+See [CODE_OF_CONDUCT.md](CODE_OF_CONDUCT.md)
+
+## Credits
+
+- Uses NoSleep.js for screen wake lock
+- Web Audio API for synthesized sounds
+- MP3 files for mobile locked-screen playback

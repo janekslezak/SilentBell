@@ -1,28 +1,22 @@
 // ─── Wake Lock Module ────────────────────────────────────────────
 // Comprehensive screen wake lock for iOS, Android, and all browsers.
-// Uses multiple fallback strategies to ensure audio continues playing.
 
 import { startSilentLoop, stopSilentLoop } from './silent-loop.js';
 
-// Wake lock state
 let nativeWakeLock = null;
 let noSleepInstance = null;
 let videoElement = null;
 let isActive = false;
 let currentMethod = null;
 
-// Platform detection
 const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent) && !window.MSStream;
-const isSafari = /Safari/.test(navigator.userAgent) && /Apple Computer/.test(navigator.vendor) && !/Chrome/.test(navigator.userAgent);
+const isAndroid = /Android/.test(navigator.userAgent);
 const isStandalone = window.navigator.standalone === true || window.matchMedia('(display-mode: standalone)').matches;
 
-// Debug logging
 const DEBUG = true;
 function log(...args) {
   if (DEBUG) console.log('[WakeLock]', ...args);
 }
-
-// ─── Native Wake Lock API ────────────────────────────────────────
 
 async function acquireNativeWakeLock() {
   if (!('wakeLock' in navigator)) {
@@ -36,7 +30,6 @@ async function acquireNativeWakeLock() {
       log('Native wake lock released');
       nativeWakeLock = null;
       
-      // Auto-reacquire if still needed and visible
       if (isActive && document.visibilityState === 'visible') {
         log('Auto-reacquiring wake lock...');
         setTimeout(() => acquireWakeLock(), 100);
@@ -50,8 +43,6 @@ async function acquireNativeWakeLock() {
     throw err;
   }
 }
-
-// ─── NoSleep.js Fallback ─────────────────────────────────────────
 
 async function acquireNoSleepWakeLock() {
   if (typeof window.NoSleep === 'undefined') {
@@ -72,8 +63,6 @@ async function acquireNoSleepWakeLock() {
   }
 }
 
-// ─── Video Element Fallback (iOS-specific) ───────────────────────
-
 async function acquireVideoWakeLock() {
   try {
     if (!videoElement) {
@@ -83,7 +72,6 @@ async function acquireVideoWakeLock() {
       videoElement.setAttribute('loop', '');
       videoElement.style.cssText = 'position:fixed;top:0;left:0;width:1px;height:1px;opacity:0;pointer-events:none;z-index:-1;';
       
-      // Use a minimal silent WebM video
       const webmBlob = new Blob([
         new Uint8Array([0x1A, 0x45, 0xDF, 0xA3, 0x9F, 0x42, 0x86, 0x81, 0x01, 0x42, 0xF7, 0x81,
           0x01, 0x42, 0xF2, 0x81, 0x04, 0x42, 0xF3, 0x81, 0x08, 0x42, 0x82, 0x84,
@@ -94,7 +82,6 @@ async function acquireVideoWakeLock() {
       document.body.appendChild(videoElement);
     }
     
-    // iOS requires user interaction to play video
     videoElement.muted = true;
     videoElement.volume = 0;
     
@@ -107,8 +94,6 @@ async function acquireVideoWakeLock() {
   }
 }
 
-// ─── Main Wake Lock API ──────────────────────────────────────────
-
 export async function acquireWakeLock() {
   if (isActive) {
     log('Wake lock already active');
@@ -117,10 +102,8 @@ export async function acquireWakeLock() {
   
   isActive = true;
   
-  // Start silent loop for audio continuity (critical for iOS)
   startSilentLoop();
   
-  // Try methods in order of preference
   const methods = [
     { name: 'native', fn: acquireNativeWakeLock },
     { name: 'nosleep', fn: acquireNoSleepWakeLock },
@@ -138,7 +121,6 @@ export async function acquireWakeLock() {
     }
   }
   
-  // All methods failed, but we still have silent loop
   log('All wake lock methods failed, using silent loop only');
   currentMethod = 'audio-only';
   return 'audio-only';
@@ -148,10 +130,8 @@ export async function releaseWakeLock() {
   isActive = false;
   currentMethod = null;
   
-  // Stop silent loop
   stopSilentLoop();
   
-  // Release native wake lock
   if (nativeWakeLock) {
     try {
       await nativeWakeLock.release();
@@ -162,7 +142,6 @@ export async function releaseWakeLock() {
     nativeWakeLock = null;
   }
   
-  // Disable NoSleep.js
   if (noSleepInstance) {
     try {
       noSleepInstance.disable();
@@ -173,7 +152,6 @@ export async function releaseWakeLock() {
     noSleepInstance = null;
   }
   
-  // Stop video
   if (videoElement) {
     try {
       videoElement.pause();
@@ -193,35 +171,42 @@ export function getWakeLockMethod() {
   return currentMethod;
 }
 
-// ─── iOS-Specific Audio Keepalive ────────────────────────────────
-
-// iOS suspends AudioContext when screen locks - we need to keep it alive
 let audioKeepaliveInterval = null;
-let lastAudioContextState = null;
+let silentBufferSource = null;
 
 export function startAudioKeepalive(audioContext) {
   if (audioKeepaliveInterval) {
     clearInterval(audioKeepaliveInterval);
   }
   
-  // Monitor and maintain audio context state
+  if (isIOS && audioContext) {
+    try {
+      const oscillator = audioContext.createOscillator();
+      const gainNode = audioContext.createGain();
+      
+      oscillator.frequency.value = 1;
+      gainNode.gain.value = 0.001;
+      
+      oscillator.connect(gainNode);
+      gainNode.connect(audioContext.destination);
+      
+      oscillator.start();
+      silentBufferSource = oscillator;
+      
+      log('iOS continuous silent audio started');
+    } catch (e) {
+      log('Error starting continuous silent audio:', e.message);
+    }
+  }
+  
   audioKeepaliveInterval = setInterval(() => {
     if (!audioContext) return;
     
-    const state = audioContext.state;
-    
-    if (state !== lastAudioContextState) {
-      log('AudioContext state changed:', lastAudioContextState, '->', state);
-      lastAudioContextState = state;
-    }
-    
-    // Try to resume if suspended
-    if (state === 'suspended') {
+    if (audioContext.state === 'suspended') {
       log('Attempting to resume AudioContext...');
       audioContext.resume().catch(() => {});
     }
     
-    // Play a silent buffer to keep audio session alive
     try {
       const buffer = audioContext.createBuffer(1, 128, audioContext.sampleRate);
       const source = audioContext.createBufferSource();
@@ -230,7 +215,7 @@ export function startAudioKeepalive(audioContext) {
       source.start(0);
     } catch (e) {}
     
-  }, 1000); // Check every second
+  }, 1000);
   
   log('Audio keepalive started');
 }
@@ -241,55 +226,62 @@ export function stopAudioKeepalive() {
     audioKeepaliveInterval = null;
     log('Audio keepalive stopped');
   }
+  
+  if (silentBufferSource) {
+    try {
+      silentBufferSource.stop();
+      silentBufferSource = null;
+    } catch (e) {}
+  }
 }
 
-// ─── Visibility Change Handler ───────────────────────────────────
-
-// iOS often releases wake lock when visibility changes
 export function setupVisibilityHandler(audioContext) {
   document.addEventListener('visibilitychange', async () => {
     log('Visibility changed:', document.visibilityState);
     
     if (document.visibilityState === 'visible') {
-      // Page became visible - reacquire if needed
       if (isActive && !nativeWakeLock && !noSleepInstance) {
         log('Reacquiring wake lock after visibility change...');
         await acquireWakeLock();
       }
       
-      // Resume audio context if suspended
       if (audioContext && audioContext.state === 'suspended') {
         log('Resuming AudioContext after visibility change...');
         audioContext.resume().catch(() => {});
+      }
+    } else {
+      if (isActive) {
+        log('Page hidden - ensuring silent loop for locked screen');
+        startSilentLoop();
       }
     }
   });
 }
 
-// ─── iOS Standalone Mode Check ───────────────────────────────────
-
 export function isIOSStandalone() {
   return isIOS && isStandalone;
 }
 
-// iOS in standalone mode (added to home screen) has different behavior
 export function setupIOSStandaloneHandler() {
   if (!isIOSStandalone()) return;
   
   log('iOS standalone mode detected');
   
-  // iOS standalone apps have better audio persistence
-  // but still need the silent loop
   window.addEventListener('pagehide', () => {
     log('Page hide event - maintaining audio session');
+    if (isActive) {
+      startSilentLoop();
+    }
   });
   
   window.addEventListener('pageshow', () => {
     log('Page show event - checking audio session');
   });
+  
+  window.addEventListener('beforeunload', () => {
+    cleanupWakeLock();
+  });
 }
-
-// ─── Cleanup ─────────────────────────────────────────────────────
 
 export function cleanupWakeLock() {
   releaseWakeLock();
@@ -304,14 +296,12 @@ export function cleanupWakeLock() {
   }
 }
 
-// ─── Debug Info ──────────────────────────────────────────────────
-
 export function getWakeLockInfo() {
   return {
     isActive,
     currentMethod,
     isIOS,
-    isSafari,
+    isAndroid,
     isStandalone,
     nativeWakeLock: nativeWakeLock ? { released: nativeWakeLock.released } : null,
     noSleepInstance: noSleepInstance ? { enabled: noSleepInstance.enabled } : null,

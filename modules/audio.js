@@ -1,18 +1,235 @@
 // ─── Audio Engine Module ─────────────────────────────────────────
-// Synthesized meditation sounds with error handling.
+// Hybrid audio system: Web Audio API for synthesis + HTML5 Audio for locked-screen playback
 
-import { 
-  getAudioContext, 
-  ensureAudioContext,
-  unlockAudio 
-} from './audio-context.js';
+import { getAudioContext } from './audio-context.js';
 
-// Re-export for convenience
 export { getAudioContext, ensureAudioContext, unlockAudio } from './audio-context.js';
+
+const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent) && !window.MSStream;
+const isAndroid = /Android/.test(navigator.userAgent);
+
+const DEBUG = true;
+function log(...args) {
+  if (DEBUG) console.log('[Audio]', ...args);
+}
+
+let audioMode = 'auto';
+
+const audioCache = new Map();
+const audioPreloadPromises = new Map();
+let activeAudioElements = [];
+
+const AUDIO_FILES = {
+  'bell': {
+    start: 'sounds/sequence_bell_start.mp3',
+    interval: 'sounds/sequence_bell_interval.mp3',
+    end: 'sounds/sequence_bell_end.mp3',
+    single: 'sounds/temple_bell_standard.mp3'
+  },
+  'bell-high': {
+    start: 'sounds/sequence_bell_high_start.mp3',
+    interval: 'sounds/sequence_bell_high_interval.mp3',
+    end: 'sounds/sequence_bell_high_end.mp3',
+    single: 'sounds/temple_bell_high.mp3'
+  },
+  'chugpi': {
+    start: 'sounds/sequence_chugpi_start.mp3',
+    interval: 'sounds/sequence_chugpi_interval.mp3',
+    end: 'sounds/sequence_chugpi_end.mp3',
+    single: 'sounds/chugpi.mp3'
+  }
+};
+
+export function detectBestAudioMode() {
+  if (isIOS) {
+    log('iOS detected - using HTML5 Audio');
+    return 'html5';
+  }
+  
+  if (isAndroid) {
+    log('Android detected - using HTML5 Audio for locked screen support');
+    return 'html5';
+  }
+  
+  log('Desktop detected - using Web Audio API');
+  return 'webaudio';
+}
+
+export function setAudioMode(mode) {
+  if (['auto', 'webaudio', 'html5'].includes(mode)) {
+    audioMode = mode;
+    log('Audio mode set to:', mode);
+  }
+}
+
+export function getAudioMode() {
+  if (audioMode === 'auto') {
+    return detectBestAudioMode();
+  }
+  return audioMode;
+}
+
+function getAudioElement(src) {
+  if (audioCache.has(src)) {
+    return audioCache.get(src);
+  }
+  
+  const audio = new Audio(src);
+  audio.preload = 'auto';
+  audioCache.set(src, audio);
+  return audio;
+}
+
+export function preloadAudio(src) {
+  if (audioPreloadPromises.has(src)) {
+    return audioPreloadPromises.get(src);
+  }
+  
+  const promise = new Promise((resolve, reject) => {
+    const audio = getAudioElement(src);
+    
+    if (audio.readyState >= 3) {
+      resolve(audio);
+      return;
+    }
+    
+    audio.addEventListener('canplaythrough', () => resolve(audio), { once: true });
+    audio.addEventListener('error', (e) => reject(new Error(`Failed to load ${src}`)), { once: true });
+    
+    setTimeout(() => {
+      if (audio.readyState >= 2) {
+        resolve(audio);
+      }
+    }, 5000);
+  });
+  
+  audioPreloadPromises.set(src, promise);
+  return promise;
+}
+
+export async function preloadSoundSet(soundType) {
+  const files = AUDIO_FILES[soundType];
+  if (!files) return;
+  
+  try {
+    await Promise.all([
+      preloadAudio(files.start),
+      preloadAudio(files.interval),
+      preloadAudio(files.end)
+    ]);
+    log(`Preloaded ${soundType} sound set`);
+  } catch (error) {
+    log('Failed to preload sound set:', error.message);
+  }
+}
+
+export function stopAllAudio() {
+  activeAudioElements.forEach(audio => {
+    try {
+      audio.pause();
+      audio.currentTime = 0;
+    } catch (e) {}
+  });
+  activeAudioElements = [];
+}
+
+async function playHTML5Audio(src, volume = 1.0) {
+  try {
+    const audio = getAudioElement(src);
+    audio.volume = volume;
+    audio.currentTime = 0;
+    
+    activeAudioElements.push(audio);
+    
+    audio.addEventListener('ended', () => {
+      const idx = activeAudioElements.indexOf(audio);
+      if (idx > -1) activeAudioElements.splice(idx, 1);
+    }, { once: true });
+    
+    await audio.play();
+    log('Playing HTML5 audio:', src);
+    return true;
+  } catch (error) {
+    log('HTML5 audio playback failed:', error.message);
+    return false;
+  }
+}
+
+export async function playSound(type, timeSeconds = 0) {
+  if (type === 'none') return;
+  
+  const mode = getAudioMode();
+  
+  if (mode === 'html5') {
+    const files = AUDIO_FILES[type] || AUDIO_FILES['bell'];
+    setTimeout(() => {
+      playHTML5Audio(files.single, 1.0);
+    }, timeSeconds * 1000);
+  } else {
+    playWebAudioSound(type, timeSeconds);
+  }
+}
+
+export async function playStrokes(type, count, startDelay = 0) {
+  if (type === 'none') return;
+  
+  const mode = getAudioMode();
+  
+  if (mode === 'html5') {
+    const files = AUDIO_FILES[type] || AUDIO_FILES['bell'];
+    setTimeout(() => {
+      playHTML5Audio(files.start, 1.0);
+    }, startDelay * 1000);
+  } else {
+    playWebAudioStrokes(type, count, startDelay);
+  }
+}
+
+export async function playStartSound(type) {
+  if (type === 'none') return;
+  
+  const mode = getAudioMode();
+  const files = AUDIO_FILES[type] || AUDIO_FILES['bell'];
+  
+  if (mode === 'html5') {
+    await playHTML5Audio(files.start, 1.0);
+  } else {
+    if (type === 'chugpi') {
+      playWebAudioStrokes(type, 3, 0);
+    } else {
+      playWebAudioSound(type, 0);
+    }
+  }
+}
+
+export async function playIntervalSound(type) {
+  if (type === 'none') return;
+  
+  const mode = getAudioMode();
+  const files = AUDIO_FILES[type] || AUDIO_FILES['bell'];
+  
+  if (mode === 'html5') {
+    await playHTML5Audio(files.interval, 0.8);
+  } else {
+    playWebAudioSound(type, 0);
+  }
+}
+
+export async function playEndSound(type) {
+  if (type === 'none') return;
+  
+  const mode = getAudioMode();
+  const files = AUDIO_FILES[type] || AUDIO_FILES['bell'];
+  
+  if (mode === 'html5') {
+    await playHTML5Audio(files.end, 1.0);
+  } else {
+    playWebAudioEndSequence(type);
+  }
+}
 
 let chugpiMaster = null;
 
-// Get or create Chugpi master compressor
 export function getChugpiMaster() {
   const ctx = getAudioContext();
   if (!chugpiMaster) {
@@ -24,7 +241,6 @@ export function getChugpiMaster() {
     chugpiMaster.release.value = 0.15;
     chugpiMaster.connect(ctx.destination);
     
-    // Prime the audio graph
     const primeBuf = ctx.createBuffer(1, 2048, ctx.sampleRate);
     const primeSrc = ctx.createBufferSource();
     primeSrc.buffer = primeBuf; 
@@ -38,9 +254,88 @@ export function resetChugpiMaster() {
   chugpiMaster = null;
 }
 
-// ─── Temple Bell Synthesizer ──────────────────────────────────────
+function playWebAudioSound(type, timeSeconds = 0) {
+  const ctx = getAudioContext();
+  
+  function doPlay() { 
+    if (type === 'bell-high') {
+      playTempleBellHigh(ctx.currentTime + timeSeconds); 
+    } else if (type === 'chugpi') {
+      playChugpiNow(ctx.currentTime + timeSeconds);
+    } else {
+      playTempleBell(ctx.currentTime + timeSeconds); 
+    }
+  }
+  
+  if (ctx.state === 'suspended') { 
+    ctx.resume().then(doPlay).catch(() => doPlay()); 
+  } else { 
+    doPlay(); 
+  }
+}
 
-export function playTempleBell(startTime, velocity = 1.0) {
+function playWebAudioStrokes(type, count, startDelay = 0) {
+  if (type === 'none') return;
+  
+  const interval = type === 'chugpi' ? 1.5 : 1.4;
+  
+  if (type === 'chugpi') {
+    const ctx = getAudioContext(); 
+    getChugpiMaster();
+    const leadIn = 0.15;
+    
+    for (let i = 0; i < count; i++) {
+      const delay = leadIn + startDelay + i * interval;
+      
+      function doPlay() { 
+        playChugpiNow(ctx.currentTime + delay, 1.0); 
+      }
+      
+      if (ctx.state === 'suspended') { 
+        ctx.resume().then(doPlay).catch(() => doPlay()); 
+      } else { 
+        doPlay(); 
+      }
+    }
+  } else {
+    for (let i = 0; i < count; i++) {
+      playWebAudioSound(type, startDelay + i * interval);
+    }
+  }
+}
+
+function playWebAudioEndSequence(type) {
+  const ctx = getAudioContext();
+  
+  function doEnding() {
+    const now = ctx.currentTime;
+    
+    if (type === 'chugpi') {
+      getChugpiMaster();
+      playChugpiNow(now + 0.15, 1.0);
+      playChugpiNow(now + 1.65, 1.0);
+      playChugpiNow(now + 3.15, 1.0);
+    } else if (type === 'bell-high') {
+      playSingingBowlEdgeHigh(now + 0.0);
+      playTempleBellHigh(now + 1.8, 0.55);
+      playTempleBellHigh(now + 5.8, 1.0);
+      playTempleBellHigh(now + 9.8, 1.0);
+    } else {
+      playSingingBowlEdge(now + 0.0);
+      playTempleBell(now + 1.8, 0.55);
+      playTempleBell(now + 5.8, 1.0);
+      playTempleBell(now + 9.8, 1.0);
+    }
+  }
+  
+  if (ctx.state === 'suspended') { 
+    ctx.resume().then(doEnding).catch(doEnding); 
+  } else { 
+    doEnding(); 
+  }
+}
+
+function playTempleBell(startTime, velocity = 1.0) {
   const ctx = getAudioContext();
   const t0 = startTime ?? ctx.currentTime;
   
@@ -65,7 +360,6 @@ export function playTempleBell(startTime, velocity = 1.0) {
   lpf.connect(tailFade); 
   tailFade.connect(ctx.destination);
   
-  // Clank
   const clankSize = Math.floor(ctx.sampleRate * 0.04);
   const clankBuf = ctx.createBuffer(1, clankSize, ctx.sampleRate);
   const clankData = clankBuf.getChannelData(0);
@@ -92,7 +386,6 @@ export function playTempleBell(startTime, velocity = 1.0) {
   clankSrc.start(t0); 
   clankSrc.stop(t0 + 0.08);
   
-  // Partials
   function addPartial(freq, gainPeak, attackTime, decayTime) {
     const osc = ctx.createOscillator();
     osc.type = 'sine'; 
@@ -111,9 +404,8 @@ export function playTempleBell(startTime, velocity = 1.0) {
   addPartial(304,  0.22, 0.010, 11.0);
   addPartial(594,  0.14, 0.008,  8.0);
   addPartial(982,  0.08, 0.005,  5.5);
-  addPartial(1627, 0.04, 0.004,  3.5);
+  addPartial(1627, 0.04, 0.004, 3.5);
   
-  // Shimmer
   const shimmerLfo = ctx.createOscillator();
   shimmerLfo.type = 'sine'; 
   shimmerLfo.frequency.value = 4.5;
@@ -136,9 +428,7 @@ export function playTempleBell(startTime, velocity = 1.0) {
   shimmerFund.stop(t0 + 16.0);
 }
 
-// ─── Temple Bell — Higher Pitch ───────────────────────────────────
-
-export function playTempleBellHigh(startTime, velocity = 1.0) {
+function playTempleBellHigh(startTime, velocity = 1.0) {
   const ctx = getAudioContext();
   const t0 = startTime ?? ctx.currentTime;
   
@@ -163,7 +453,6 @@ export function playTempleBellHigh(startTime, velocity = 1.0) {
   lpf.connect(tailFade); 
   tailFade.connect(ctx.destination);
   
-  // Clank
   const clankSize = Math.floor(ctx.sampleRate * 0.035);
   const clankBuf = ctx.createBuffer(1, clankSize, ctx.sampleRate);
   const clankData = clankBuf.getChannelData(0);
@@ -190,7 +479,6 @@ export function playTempleBellHigh(startTime, velocity = 1.0) {
   clankSrc.start(t0); 
   clankSrc.stop(t0 + 0.07);
   
-  // Partials
   function addPartial(freq, gainPeak, attackTime, decayTime) {
     const osc = ctx.createOscillator();
     osc.type = 'sine'; 
@@ -211,7 +499,6 @@ export function playTempleBellHigh(startTime, velocity = 1.0) {
   addPartial(1473, 0.08, 0.004,  4.0);
   addPartial(2440, 0.04, 0.003,  2.5);
   
-  // Shimmer
   const shimmerLfo = ctx.createOscillator();
   shimmerLfo.type = 'sine'; 
   shimmerLfo.frequency.value = 5.5;
@@ -234,9 +521,7 @@ export function playTempleBellHigh(startTime, velocity = 1.0) {
   shimmerFund.stop(t0 + 13.0);
 }
 
-// ─── Singing Bowl Edge (standard pitch) ──────────────────────────
-
-export function playSingingBowlEdge(startTime) {
+function playSingingBowlEdge(startTime) {
   const ctx = getAudioContext(); 
   const t0 = startTime ?? ctx.currentTime;
   
@@ -255,7 +540,6 @@ export function playSingingBowlEdge(startTime) {
   master.connect(lpf); 
   lpf.connect(ctx.destination);
   
-  // Noise
   const noiseSize = Math.floor(ctx.sampleRate * 0.8);
   const noiseBuf = ctx.createBuffer(1, noiseSize, ctx.sampleRate);
   const noiseData = noiseBuf.getChannelData(0);
@@ -287,7 +571,6 @@ export function playSingingBowlEdge(startTime) {
   noiseSrc.start(t0); 
   noiseSrc.stop(t0 + 0.9);
   
-  // Partials
   function addEdgePartial(freq, gainPeak, decayTime) {
     const osc = ctx.createOscillator(); 
     osc.type = 'sine'; 
@@ -308,9 +591,7 @@ export function playSingingBowlEdge(startTime) {
   addEdgePartial(594, 0.02, 2.0);
 }
 
-// ─── Singing Bowl Edge (higher pitch) ────────────────────────────
-
-export function playSingingBowlEdgeHigh(startTime) {
+function playSingingBowlEdgeHigh(startTime) {
   const ctx = getAudioContext(); 
   const t0 = startTime ?? ctx.currentTime;
   
@@ -329,7 +610,6 @@ export function playSingingBowlEdgeHigh(startTime) {
   master.connect(lpf); 
   lpf.connect(ctx.destination);
   
-  // Noise
   const noiseSize = Math.floor(ctx.sampleRate * 0.8);
   const noiseBuf = ctx.createBuffer(1, noiseSize, ctx.sampleRate);
   const noiseData = noiseBuf.getChannelData(0);
@@ -361,7 +641,6 @@ export function playSingingBowlEdgeHigh(startTime) {
   noiseSrc.start(t0); 
   noiseSrc.stop(t0 + 0.85);
   
-  // Partials
   function addEdgePartial(freq, gainPeak, decayTime) {
     const osc = ctx.createOscillator(); 
     osc.type = 'sine'; 
@@ -382,15 +661,12 @@ export function playSingingBowlEdgeHigh(startTime) {
   addEdgePartial(891, 0.02, 1.6);
 }
 
-// ─── Chugpi (죽비) Synthesizer ────────────────────────────────────
-
-export function playChugpiNow(startTime, velocity = 1.0) {
+function playChugpiNow(startTime, velocity = 1.0) {
   const ctx = getAudioContext(); 
   const master = getChugpiMaster();
   const now = startTime ?? ctx.currentTime; 
   const v = velocity;
   
-  // Snap
   const snapSize = Math.floor(ctx.sampleRate * 0.015);
   const snapBuf = ctx.createBuffer(1, snapSize, ctx.sampleRate);
   const snapData = snapBuf.getChannelData(0);
@@ -427,7 +703,6 @@ export function playChugpiNow(startTime, velocity = 1.0) {
   snapSrc.start(now); 
   snapSrc.stop(now + 0.018);
   
-  // Flesh
   const flesSize = Math.floor(ctx.sampleRate * 0.08);
   const flesBuf = ctx.createBuffer(1, flesSize, ctx.sampleRate);
   const flesData = flesBuf.getChannelData(0);
@@ -473,7 +748,6 @@ export function playChugpiNow(startTime, velocity = 1.0) {
   flesSrc.start(now); 
   flesSrc.stop(now + 0.09);
   
-  // Palm
   const palmOsc = ctx.createOscillator(); 
   palmOsc.type = 'sine';
   palmOsc.frequency.setValueAtTime(200, now);
@@ -487,7 +761,6 @@ export function playChugpiNow(startTime, velocity = 1.0) {
   palmOsc.start(now); 
   palmOsc.stop(now + 0.09);
   
-  // Thud
   const thudSize = Math.floor(ctx.sampleRate * 0.055);
   const thudBuf = ctx.createBuffer(1, thudSize, ctx.sampleRate);
   const thudData = thudBuf.getChannelData(0);
@@ -513,88 +786,17 @@ export function playChugpiNow(startTime, velocity = 1.0) {
   thudSrc.stop(now + 0.06);
 }
 
-// ─── Unified play functions ───────────────────────────────────────
-
 export function playBell(timeSeconds = 0) {
-  const ctx = getAudioContext();
-  
-  function doPlay() { 
-    playTempleBell(ctx.currentTime + timeSeconds); 
-  }
-  
-  if (ctx.state === 'suspended') { 
-    ctx.resume().then(doPlay).catch(() => doPlay()); 
-  } else { 
-    doPlay(); 
-  }
+  playSound('bell', timeSeconds);
 }
 
 export function playBellHigh(timeSeconds = 0) {
-  const ctx = getAudioContext();
-  
-  function doPlay() { 
-    playTempleBellHigh(ctx.currentTime + timeSeconds); 
-  }
-  
-  if (ctx.state === 'suspended') { 
-    ctx.resume().then(doPlay).catch(() => doPlay()); 
-  } else { 
-    doPlay(); 
-  }
+  playSound('bell-high', timeSeconds);
 }
 
 export function playChugpi(timeSeconds = 0) {
-  const ctx = getAudioContext();
-  
-  function doPlay() { 
-    playChugpiNow(ctx.currentTime + timeSeconds); 
-  }
-  
-  if (ctx.state === 'suspended') { 
-    ctx.resume().then(doPlay).catch(() => doPlay()); 
-  } else { 
-    doPlay(); 
-  }
+  playSound('chugpi', timeSeconds);
 }
 
-export function playSound(type, timeSeconds = 0) {
-  if (type === 'none') return;
-  
-  if (type === 'chugpi') {
-    playChugpi(timeSeconds);
-  } else if (type === 'bell-high') {
-    playBellHigh(timeSeconds);
-  } else {
-    playBell(timeSeconds);
-  }
-}
-
-export function playStrokes(type, count, startDelay = 0) {
-  if (type === 'none') return;
-  
-  const interval = type === 'chugpi' ? 1.5 : 1.4;
-  
-  if (type === 'chugpi') {
-    const ctx = getAudioContext(); 
-    getChugpiMaster();
-    const leadIn = 0.15;
-    
-    for (let i = 0; i < count; i++) {
-      const delay = leadIn + startDelay + i * interval;
-      
-      function doPlay() { 
-        playChugpiNow(ctx.currentTime + delay, 1.0); 
-      }
-      
-      if (ctx.state === 'suspended') { 
-        ctx.resume().then(doPlay).catch(() => doPlay()); 
-      } else { 
-        doPlay(); 
-      }
-    }
-  } else {
-    for (let i = 0; i < count; i++) {
-      playSound(type, startDelay + i * interval);
-    }
-  }
-}
+log('Audio module loaded. Platform:', isIOS ? 'iOS' : isAndroid ? 'Android' : 'Desktop');
+log('Detected audio mode:', detectBestAudioMode());

@@ -2,20 +2,57 @@
 <html lang="en" data-theme="dark">
 <head>
   <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
   <meta name="theme-color" content="#111820" />
+  <meta name="background-color" content="#111820" />
+  
+  <!-- iOS PWA Support -->
   <meta name="apple-mobile-web-app-capable" content="yes" />
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
   <meta name="apple-mobile-web-app-title" content="Silent Bell" />
-  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; media-src 'self' data:; connect-src 'self'; font-src 'self'; manifest-src 'self';" />
+  
+  <!-- iOS Splash Screen Images -->
+  <link rel="apple-touch-icon" href="icon-192.png" />
+  <link rel="apple-touch-icon" sizes="152x152" href="icon-192.png" />
+  <link rel="apple-touch-icon" sizes="180x180" href="icon-192.png" />
+  <link rel="apple-touch-icon" sizes="167x167" href="icon-192.png" />
+  <link rel="apple-touch-icon-precomposed" href="icon-192.png" />
+  
+  <!-- iOS Splash Screen (iPhone) -->
+  <link rel="apple-touch-startup-image" href="icon-512.png" media="(device-width: 320px) and (device-height: 568px) and (-webkit-device-pixel-ratio: 2)" />
+  <link rel="apple-touch-startup-image" href="icon-512.png" media="(device-width: 375px) and (device-height: 667px) and (-webkit-device-pixel-ratio: 2)" />
+  <link rel="apple-touch-startup-image" href="icon-512.png" media="(device-width: 375px) and (device-height: 812px) and (-webkit-device-pixel-ratio: 3)" />
+  <link rel="apple-touch-startup-image" href="icon-512.png" media="(device-width: 414px) and (device-height: 736px) and (-webkit-device-pixel-ratio: 3)" />
+  <link rel="apple-touch-startup-image" href="icon-512.png" media="(device-width: 414px) and (device-height: 896px) and (-webkit-device-pixel-ratio: 2)" />
+  <link rel="apple-touch-startup-image" href="icon-512.png" media="(device-width: 414px) and (device-height: 896px) and (-webkit-device-pixel-ratio: 3)" />
+  
+  <!-- iOS Splash Screen (iPad) -->
+  <link rel="apple-touch-startup-image" href="icon-512.png" media="(device-width: 768px) and (device-height: 1024px) and (-webkit-device-pixel-ratio: 2)" />
+  <link rel="apple-touch-startup-image" href="icon-512.png" media="(device-width: 834px) and (device-height: 1112px) and (-webkit-device-pixel-ratio: 2)" />
+  <link rel="apple-touch-startup-image" href="icon-512.png" media="(device-width: 834px) and (device-height: 1194px) and (-webkit-device-pixel-ratio: 2)" />
+  <link rel="apple-touch-startup-image" href="icon-512.png" media="(device-width: 1024px) and (device-height: 1366px) and (-webkit-device-pixel-ratio: 2)" />
+  
+  <meta name="format-detection" content="telephone=no" />
+  
   <title>Silent Bell</title>
   <link rel="manifest" href="manifest.json" />
-  <link rel="apple-touch-icon" href="icon-192.png" />
-  <link rel="apple-touch-icon" sizes="152x152" href="icon-192.png">
-  <link rel="apple-touch-icon-precomposed" href="icon-192.png">
   <link rel="stylesheet" href="style.css" />
+  
+  <!-- Preload critical audio files -->
+  <link rel="preload" href="sounds/sequence_bell_start.mp3" as="audio" />
+  <link rel="preload" href="sounds/sequence_bell_interval.mp3" as="audio" />
+  <link rel="preload" href="sounds/sequence_bell_end.mp3" as="audio" />
 </head>
 <body>
+
+  <!-- iOS Loading Screen Overlay -->
+  <div id="ios-loading-screen" style="display: none;">
+    <div class="ios-loading-content">
+      <img src="icon-192.png" alt="Silent Bell" class="ios-loading-icon" />
+      <div class="ios-loading-spinner"></div>
+      <p class="ios-loading-text">Silent Bell</p>
+    </div>
+  </div>
 
   <header>
     <div class="header-left">
@@ -92,7 +129,6 @@
     
     <div id="log-chart"></div>
 
-    <!-- Action buttons directly under chart -->
     <div class="log-actions">
       <button id="btn-manual-log" data-i18n="btn_manual">+ Manual</button>
       <button id="btn-export"     data-i18n="btn_export">Export CSV</button>
@@ -100,7 +136,6 @@
       <input  id="import-csv-file" type="file" accept=".csv" style="display:none;">
     </div>
 
-    <!-- Manual entry form (hidden until toggled) -->
     <div id="manual-entry" class="manual-entry">
       <div class="manual-entry-title" data-i18n="manual_title">Log Manual Session</div>
       <div class="manual-entry-row">
@@ -172,7 +207,7 @@
 
   </div>
 
-  <!-- iOS install banner — shown only by JS on eligible iOS devices -->
+  <!-- iOS install banner -->
   <div id="ios-install-banner" style="display:none">
     <span id="ios-install-text">To install: tap
       <svg width="16" height="16" viewBox="0 0 50 50" fill="currentColor"
@@ -182,7 +217,7 @@
       </svg>
       then "Add to Home Screen"
     </span>
-    <button id="ios-install-close">✕</button>
+    <button id="ios-install-close">&#10005;</button>
   </div>
 
   <script src="NoSleep.min.js"></script>
@@ -191,7 +226,7 @@
   <footer class="footer">
     <div class="container">
       <div class="footer-row">
-        <p>&copy; 2026 Silent Bell - v2.1.0</p>
+        <p>&copy; 2026 Silent Bell - v1.3.0beta</p>
       </div>
       <div class="footer-row">
         <p>

@@ -25,7 +25,7 @@ const DEFAULT_STATE = {
     currentSound: 'bell',
     intervalMinutes: 0,
     nextIntervalAt: null,
-    contextState: 'suspended', // 'suspended' | 'running' | 'interrupted' | 'closed'
+    contextState: 'suspended',
     lastError: null
   },
   settings: {
@@ -38,16 +38,15 @@ const DEFAULT_STATE = {
     theme: 'dark'
   },
   log: {
-    chartMode: 'week', // 'week' | 'average'
+    chartMode: 'week',
     sessions: []
   },
   wakeLock: {
     isActive: false,
-    type: null // 'native' | 'nosleep' | 'video' | 'none'
+    type: null
   }
 };
 
-// Deep freeze utility for immutable state
 function deepFreeze(obj) {
   if (obj === null || typeof obj !== 'object') return obj;
   if (Object.isFrozen(obj)) return obj;
@@ -62,7 +61,6 @@ function deepFreeze(obj) {
   return Object.freeze(obj);
 }
 
-// Deep clone utility
 function deepClone(obj) {
   if (obj === null || typeof obj !== 'object') return obj;
   if (obj instanceof Date) return new Date(obj.getTime());
@@ -77,7 +75,6 @@ function deepClone(obj) {
   return cloned;
 }
 
-// State store class
 class StateStore {
   constructor() {
     this._state = deepFreeze(deepClone(DEFAULT_STATE));
@@ -87,12 +84,10 @@ class StateStore {
     this._pendingNotifications = new Set();
   }
 
-  // Get current state (immutable)
   getState() {
     return this._state;
   }
 
-  // Get specific path from state
   get(path) {
     const keys = path.split('.');
     let value = this._state;
@@ -103,7 +98,6 @@ class StateStore {
     return value;
   }
 
-  // Subscribe to state changes
   subscribe(path, callback) {
     const id = ++this._listenerId;
     const entry = { path, callback, id };
@@ -113,7 +107,6 @@ class StateStore {
     }
     this._listeners.get(path).add(entry);
     
-    // Return unsubscribe function
     return () => {
       const listeners = this._listeners.get(path);
       if (listeners) {
@@ -125,7 +118,6 @@ class StateStore {
     };
   }
 
-  // Batch multiple updates
   batch(callback) {
     this._batchDepth++;
     try {
@@ -138,7 +130,6 @@ class StateStore {
     }
   }
 
-  // Update state at path
   set(path, value) {
     const keys = path.split('.');
     const newState = deepClone(this._state);
@@ -166,7 +157,6 @@ class StateStore {
     return this._state;
   }
 
-  // Merge partial state
   merge(path, partial) {
     const current = this.get(path);
     if (typeof current !== 'object' || current === null) {
@@ -175,13 +165,11 @@ class StateStore {
     return this.set(path, { ...current, ...partial });
   }
 
-  // Reset state to defaults
   reset() {
     this._state = deepFreeze(deepClone(DEFAULT_STATE));
     this._notifyAll();
   }
 
-  // Load state from storage with migration
   loadFromStorage() {
     try {
       const storage = new Storage();
@@ -192,11 +180,9 @@ class StateStore {
         return;
       }
       
-      // Version migration
       const version = saved.version || 1;
       const migrated = this._migrateState(saved, version);
       
-      // Merge with defaults to ensure all fields exist
       const merged = this._mergeWithDefaults(migrated);
       this._state = deepFreeze(merged);
       
@@ -207,7 +193,6 @@ class StateStore {
     }
   }
 
-  // Save state to storage
   saveToStorage() {
     try {
       const storage = new Storage();
@@ -217,7 +202,6 @@ class StateStore {
     }
   }
 
-  // Legacy migration from individual localStorage keys
   _migrateLegacySettings() {
     const storage = new Storage();
     const legacy = {
@@ -256,13 +240,11 @@ class StateStore {
     }
   }
 
-  // Migrate state between versions
   _migrateState(state, fromVersion) {
     if (fromVersion === SCHEMA_VERSION) return state;
     
     let migrated = deepClone(state);
     
-    // v1 -> v2: Added wakeLock and audio.contextState
     if (fromVersion < 2) {
       migrated.wakeLock = deepClone(DEFAULT_STATE.wakeLock);
       migrated.audio = { ...migrated.audio, ...DEFAULT_STATE.audio };
@@ -272,7 +254,6 @@ class StateStore {
     return migrated;
   }
 
-  // Merge saved state with defaults
   _mergeWithDefaults(saved) {
     const merged = deepClone(DEFAULT_STATE);
     
@@ -292,18 +273,15 @@ class StateStore {
     return merged;
   }
 
-  // Queue notification for path
   _queueNotification(path) {
     this._pendingNotifications.add(path);
     
-    // Also queue parent paths
     const parts = path.split('.');
     for (let i = 1; i < parts.length; i++) {
       this._pendingNotifications.add(parts.slice(0, i).join('.'));
     }
   }
 
-  // Flush pending notifications
   _flushNotifications() {
     if (this._pendingNotifications.size === 0) return;
     
@@ -316,7 +294,6 @@ class StateStore {
     this._pendingNotifications.clear();
   }
 
-  // Notify listeners for specific path
   _notifyPath(path, notified) {
     if (notified.has(path)) return;
     notified.add(path);
@@ -333,7 +310,6 @@ class StateStore {
       }
     }
     
-    // Notify wildcard listeners
     const wildcard = this._listeners.get('*');
     if (wildcard) {
       for (const { callback } of wildcard) {
@@ -346,7 +322,6 @@ class StateStore {
     }
   }
 
-  // Notify all listeners
   _notifyAll() {
     for (const path of this._listeners.keys()) {
       this._notifyPath(path, new Set());
@@ -354,10 +329,8 @@ class StateStore {
   }
 }
 
-// Create singleton instance
 export const state = new StateStore();
 
-// Convenience exports
 export const getState = () => state.getState();
 export const get = (path) => state.get(path);
 export const set = (path, value) => state.set(path, value);
@@ -368,7 +341,6 @@ export const reset = () => state.reset();
 export const loadFromStorage = () => state.loadFromStorage();
 export const saveToStorage = () => state.saveToStorage();
 
-// Debug helper (only in development)
 if (typeof window !== 'undefined' && window.location?.hostname === 'localhost') {
   window.__STATE__ = state;
 }

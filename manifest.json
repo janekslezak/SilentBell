@@ -1,13 +1,16 @@
 {
   "name": "Silent Bell",
   "short_name": "Silent Bell",
-  "description": "Minimalist meditation timer",
+  "description": "Minimalist meditation timer with offline audio support",
   "start_url": "/",
   "scope": "/",
   "display": "standalone",
   "orientation": "portrait",
   "background_color": "#111820",
   "theme_color": "#111820",
+  "categories": ["health", "lifestyle", "meditation"],
+  "lang": "en",
+  "dir": "ltr",
   "icons": [
     {
       "src": "icon-192.png",
@@ -33,6 +36,15 @@
       "type": "image/png",
       "purpose": "maskable"
     }
-  ]
+  ],
+  "shortcuts": [
+    {
+      "name": "Start 20min Session",
+      "short_name": "20min",
+      "description": "Start a 20-minute meditation session",
+      "url": "/?duration=20",
+      "icons": [{ "src": "icon-192.png", "sizes": "192x192" }]
+    }
+  ],
+  "prefer_related_applications": false
 }
-

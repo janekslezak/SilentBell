@@ -2,7 +2,13 @@
 
 import { t, initI18n } from './modules/i18n.js';
 import { unlockAudio } from './modules/audio-context.js';
-import { playSound, playStrokes } from './modules/audio.js';
+import { 
+  playSound, 
+  playStrokes, 
+  preloadSoundSet, 
+  stopAllAudio,
+  getAudioMode
+} from './modules/audio.js';
 import { stopSilentLoop } from './modules/silent-loop.js';
 import {
   formatTime, getTotalSeconds, setTime, changeTime, isTimerRunning,
@@ -30,11 +36,37 @@ const displayWrap = document.getElementById('display-wrap');
 
 // Platform detection
 const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent) && !window.MSStream;
+const isAndroid = /Android/.test(navigator.userAgent);
+const isStandalone = window.navigator.standalone === true || window.matchMedia('(display-mode: standalone)').matches;
 
 // Debug logging
 const DEBUG = true;
 function log(...args) {
   if (DEBUG) console.log('[App]', ...args);
+}
+
+// ─── iOS Loading Screen ──────────────────────────────────────────
+
+function showIOSLoadingScreen() {
+  const loadingScreen = document.getElementById('ios-loading-screen');
+  if (loadingScreen && isIOS && isStandalone) {
+    loadingScreen.style.display = 'flex';
+    log('Showing iOS loading screen');
+    
+    setTimeout(() => {
+      hideIOSLoadingScreen();
+    }, 1500);
+  }
+}
+
+function hideIOSLoadingScreen() {
+  const loadingScreen = document.getElementById('ios-loading-screen');
+  if (loadingScreen) {
+    loadingScreen.classList.add('hidden');
+    setTimeout(() => {
+      loadingScreen.style.display = 'none';
+    }, 500);
+  }
 }
 
 // ─── Service Worker Registration ─────────────────────────────────
@@ -44,6 +76,15 @@ if ('serviceWorker' in navigator) {
     navigator.serviceWorker.register('sw.js')
       .then(registration => {
         log('SW registered:', registration.scope);
+        
+        registration.addEventListener('updatefound', () => {
+          const newWorker = registration.installing;
+          newWorker.addEventListener('statechange', () => {
+            if (newWorker.state === 'installed' && navigator.serviceWorker.controller) {
+              log('New version available');
+            }
+          });
+        });
       })
       .catch(error => {
         log('SW registration failed:', error);
@@ -118,6 +159,11 @@ btnStart?.addEventListener('click', async () => {
     await unlockAudio();
     log('Audio unlocked');
     
+    // Preload the selected sound set
+    const currentSound = document.getElementById('settings-sound')?.value || 'bell';
+    await preloadSoundSet(currentSound);
+    log('Sound set preloaded:', currentSound);
+    
     btnStart.disabled = true;
     statusEl.textContent = t('status_ready');
     
@@ -143,10 +189,24 @@ btnStart?.addEventListener('click', async () => {
 });
 
 btnStop?.addEventListener('click', () => {
-  const result = stopSession(display, statusEl, btnStart, btnStop);
-  
-  if (result.stopped && !result.early) {
-    disableNoSleep();
+  try {
+    log('Stop button clicked');
+    const result = stopSession(display, statusEl, btnStart, btnStop);
+    
+    if (result.stopped && !result.early) {
+      disableNoSleep();
+    }
+  } catch (error) {
+    log('Error stopping session:', error);
+    // Ensure UI is reset even on error
+    try {
+      btnStart.disabled = false;
+      btnStop.disabled = true;
+      statusEl.textContent = t('status_ready');
+      display.textContent = formatTime(getTotalSeconds());
+    } catch (e) {
+      log('Error resetting UI:', e);
+    }
   }
 });
 
@@ -258,14 +318,18 @@ document.getElementById('btn-clear-log')?.addEventListener('click', () => {
 
 document.getElementById('btn-test-sound')?.addEventListener('click', async () => {
   log('Test sound clicked');
-  await unlockAudio();
-  const type = document.getElementById('settings-sound')?.value;
-  log('Playing test sound:', type);
-  
-  if (type === 'chugpi') {
-    playStrokes('chugpi', 1);
-  } else if (type && type !== 'none') {
-    playSound(type);
+  try {
+    await unlockAudio();
+    const type = document.getElementById('settings-sound')?.value;
+    log('Playing test sound:', type, 'Mode:', getAudioMode());
+    
+    if (type === 'chugpi') {
+      playStrokes('chugpi', 1);
+    } else if (type && type !== 'none') {
+      playSound(type);
+    }
+  } catch (error) {
+    log('Test sound failed:', error);
   }
 });
 
@@ -316,27 +380,62 @@ document.addEventListener('keydown', (e) => {
 if (isIOS) {
   log('iOS detected, setting up handlers');
   
-  // Setup visibility handler for iOS wake lock reacquisition
+  if (isStandalone) {
+    showIOSLoadingScreen();
+  }
+  
   setupVisibilityHandler();
   
-  // Handle iOS-specific page lifecycle
   window.addEventListener('pagehide', () => {
     log('Page hide - maintaining audio session');
   });
   
   window.addEventListener('pageshow', () => {
     log('Page show - checking audio session');
+    unlockAudio().catch(() => {});
+  });
+  
+  document.addEventListener('visibilitychange', () => {
+    if (document.visibilityState === 'visible') {
+      log('Page visible - ensuring audio context');
+      unlockAudio().catch(() => {});
+    }
   });
 }
 
-// ─── Debug Helpers (development only) ────────────────────────────
+// ─── Android-Specific Setup ──────────────────────────────────────
+
+if (isAndroid) {
+  log('Android detected, setting up handlers');
+  
+  document.addEventListener('visibilitychange', () => {
+    if (document.visibilityState === 'visible') {
+      log('Android page visible - resuming audio if needed');
+      unlockAudio().catch(() => {});
+    }
+  });
+}
+
+// ─── Global Error Handling ───────────────────────────────────────
+
+window.addEventListener('error', (e) => {
+  log('Global error:', e.message, e.filename, e.lineno);
+});
+
+window.addEventListener('unhandledrejection', (e) => {
+  log('Unhandled promise rejection:', e.reason);
+});
+
+// ─── Debug Helpers ───────────────────────────────────────────────
 
 if (typeof window !== 'undefined') {
   window.SilentBell = {
     getWakeLockInfo,
     isTimerRunning,
     saveToStorage,
-    loadFromStorage
+    loadFromStorage,
+    getAudioMode,
+    preloadSoundSet
   };
 }
 
@@ -344,6 +443,9 @@ if (typeof window !== 'undefined') {
 
 function init() {
   log('Initializing Silent Bell...');
+  log('Platform:', isIOS ? 'iOS' : isAndroid ? 'Android' : 'Desktop');
+  log('Standalone:', isStandalone);
+  log('Audio mode:', getAudioMode());
   
   initI18n();
   loadFromStorage();
@@ -353,8 +455,11 @@ function init() {
   initDragHandler();
   saveToStorage();
   
+  // Preload default sound set
+  const defaultSound = 'bell';
+  preloadSoundSet(defaultSound).catch(() => {});
+  
   log('Silent Bell initialized');
-  log('Platform:', isIOS ? 'iOS' : 'Other');
 }
 
 if (document.readyState === 'loading') {

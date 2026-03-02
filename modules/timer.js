@@ -2,12 +2,18 @@
 // Meditation timer with countdown, interval bells, and session management.
 
 import { t } from './i18n.js';
-import { ensureAudioContext, getAudioContext } from './audio-context.js';
-import { playSound, playStrokes, playChugpiNow, getChugpiMaster, playTempleBell, playTempleBellHigh, playSingingBowlEdge, playSingingBowlEdgeHigh } from './audio.js';
+import { ensureAudioContext } from './audio-context.js';
+import { 
+  playStartSound, 
+  playIntervalSound, 
+  playEndSound,
+  preloadSoundSet,
+  stopAllAudio
+} from './audio.js';
 import { stopSilentLoop } from './silent-loop.js';
 import { saveSession, showNoteField } from './log.js';
 import { state, set, get } from './state.js';
-import { acquireWakeLock, releaseWakeLock, isWakeLockActive, startAudioKeepalive, stopAudioKeepalive, setupIOSStandaloneHandler } from './wakelock.js';
+import { acquireWakeLock, releaseWakeLock, startAudioKeepalive, stopAudioKeepalive, setupIOSStandaloneHandler } from './wakelock.js';
 
 let timerInterval = null;
 let countdownInterval = null;
@@ -17,19 +23,16 @@ let plannedDuration = 0;
 let intervalBellMs = 0;
 let nextIntervalAt = null;
 
-// Platform detection
 const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent) && !window.MSStream;
+const isAndroid = /Android/.test(navigator.userAgent);
 
-// Debug logging
 const DEBUG = true;
 function log(...args) {
   if (DEBUG) console.log('[Timer]', ...args);
 }
 
-// Initialize iOS standalone handler
 setupIOSStandaloneHandler();
 
-// Get timer state for external access
 export function getTimerState() {
   return {
     currentSound: get('audio.currentSound') || 'bell',
@@ -41,7 +44,6 @@ export function getTimerState() {
   };
 }
 
-// State setters that sync with central state
 export function setCurrentSound(sound) {
   set('audio.currentSound', sound);
 }
@@ -65,7 +67,6 @@ export function setSelectedSeconds(secs) {
   set('timer.selectedSeconds', value);
 }
 
-// Format time as MM:SS
 export function formatTime(secs) {
   const totalSeconds = Math.abs(Math.floor(secs));
   const m = String(Math.floor(totalSeconds / 60)).padStart(2, '0');
@@ -73,14 +74,12 @@ export function formatTime(secs) {
   return `${m}:${s}`;
 }
 
-// Get total seconds from state
 export function getTotalSeconds() {
   const mins = get('timer.selectedMinutes') || 20;
   const secs = get('timer.selectedSeconds') || 0;
   return mins * 60 + secs;
 }
 
-// Set time and update display
 export function setTime(totalSecs, displayEl) {
   const clamped = Math.min(28800, Math.max(60, totalSecs));
   const mins = Math.floor(clamped / 60);
@@ -94,7 +93,6 @@ export function setTime(totalSecs, displayEl) {
   }
 }
 
-// Check if time can be changed
 export function changeTime(deltaSecs) {
   if (timerInterval || countdownInterval) {
     return false;
@@ -102,12 +100,10 @@ export function changeTime(deltaSecs) {
   return true;
 }
 
-// Check if timer is running
 export function isTimerRunning() {
   return timerInterval !== null || countdownInterval !== null;
 }
 
-// Set meditating visual state
 function setMeditating(active) {
   const viewTimer = document.getElementById('view-timer');
   if (viewTimer) {
@@ -115,8 +111,6 @@ function setMeditating(active) {
   }
   set('timer.isRunning', active);
 }
-
-// ─── Prepare Countdown ───────────────────────────────────────────
 
 export function startCountdown(displayEl, statusEl, btnStart, btnStop, onComplete) {
   const prepareSeconds = get('timer.prepareSeconds') || 10;
@@ -163,8 +157,6 @@ export function clearCountdown() {
   return false;
 }
 
-// ─── Session Management ──────────────────────────────────────────
-
 export async function startSession(displayEl, statusEl, btnStart, btnStop, intervalSelectValue) {
   intervalBellMs = parseInt(intervalSelectValue, 10) * 60 * 1000 || 0;
   plannedDuration = getTotalSeconds();
@@ -174,10 +166,11 @@ export async function startSession(displayEl, statusEl, btnStart, btnStop, inter
   
   log('Starting session, duration:', plannedDuration, 'seconds');
   
-  // Ensure audio context is ready
   await ensureAudioContext();
   
-  // Acquire wake lock (critical for iOS screen-off audio)
+  const currentSound = get('audio.currentSound') || 'bell';
+  await preloadSoundSet(currentSound);
+  
   try {
     const method = await acquireWakeLock();
     log('Wake lock acquired:', method);
@@ -185,40 +178,31 @@ export async function startSession(displayEl, statusEl, btnStart, btnStop, inter
     log('Wake lock failed:', err.message);
   }
   
-  // Start audio keepalive for iOS (maintains audio context when screen off)
   if (isIOS) {
-    const ctx = getAudioContext();
-    startAudioKeepalive(ctx);
+    const ctx = window.AudioContext || window.webkitAudioContext;
+    if (ctx) {
+      startAudioKeepalive(new ctx());
+    }
     log('iOS audio keepalive started');
   }
   
-  // Play start sound
-  const currentSound = get('audio.currentSound') || 'bell';
-  
   try {
-    if (currentSound === 'chugpi') {
-      playStrokes('chugpi', 3);
-    } else if (currentSound !== 'none') {
-      playStrokes(currentSound, 1);
-    }
+    await playStartSound(currentSound);
   } catch (error) {
     log('Start sound failed:', error.message);
   }
   
-  // Update UI
   if (statusEl) statusEl.textContent = t('status_meditating');
   if (btnStart) btnStart.disabled = true;
   if (btnStop) btnStop.disabled = false;
   
   setMeditating(true);
   
-  // Start timer tick
   timerInterval = setInterval(() => {
     tick(displayEl, statusEl, btnStart, btnStop);
   }, 500);
 }
 
-// Timer tick function
 function tick(displayEl, statusEl, btnStart, btnStop) {
   const now = Date.now();
   const remaining = Math.max(0, Math.round((endTimestamp - now) / 1000));
@@ -227,12 +211,11 @@ function tick(displayEl, statusEl, btnStart, btnStop) {
     displayEl.textContent = formatTime(remaining);
   }
   
-  // Check for interval bell
   if (intervalBellMs > 0 && nextIntervalAt && now >= nextIntervalAt) {
     const currentSound = get('audio.currentSound') || 'bell';
     
     try {
-      playSound(currentSound);
+      playIntervalSound(currentSound);
     } catch (error) {
       log('Interval bell failed:', error.message);
     }
@@ -243,70 +226,40 @@ function tick(displayEl, statusEl, btnStart, btnStop) {
     }
   }
   
-  // Check for session end
   if (remaining <= 0) {
     completeSession(displayEl, statusEl, btnStart, btnStop);
   }
 }
 
-// Complete meditation session
-function completeSession(displayEl, statusEl, btnStart, btnStop) {
+async function completeSession(displayEl, statusEl, btnStart, btnStop) {
   clearInterval(timerInterval);
   timerInterval = null;
   
   setMeditating(false);
   
-  // Release wake lock
-  releaseWakeLock().catch(() => {});
+  try {
+    await releaseWakeLock();
+  } catch (e) {
+    log('Error releasing wake lock:', e.message);
+  }
   
-  // Stop audio keepalive
   stopAudioKeepalive();
   
-  // Play ending sounds
   const currentSound = get('audio.currentSound') || 'bell';
   
   try {
-    const ctx = getAudioContext();
+    await playEndSound(currentSound);
     
-    function doEnding() {
-      const now = ctx.currentTime;
-      
-      if (currentSound === 'none') { 
-        stopSilentLoop(); 
-        return; 
-      }
-      
-      if (currentSound === 'chugpi') {
-        getChugpiMaster();
-        playChugpiNow(now + 0.15, 1.0);
-        playChugpiNow(now + 1.65, 1.0);
-        playChugpiNow(now + 3.15, 1.0);
-      } else if (currentSound === 'bell-high') {
-        playSingingBowlEdgeHigh(now + 0.0);
-        playTempleBellHigh(now + 1.8, 0.55);
-        playTempleBellHigh(now + 5.8, 1.0);
-        playTempleBellHigh(now + 9.8, 1.0);
-      } else {
-        playSingingBowlEdge(now + 0.0);
-        playTempleBell(now + 1.8, 0.55);
-        playTempleBell(now + 5.8, 1.0);
-        playTempleBell(now + 9.8, 1.0);
-      }
-      
-      setTimeout(stopSilentLoop, 13000);
-    }
-    
-    if (ctx.state === 'suspended') { 
-      ctx.resume().then(doEnding).catch(doEnding); 
-    } else { 
-      doEnding(); 
-    }
+    setTimeout(() => {
+      stopSilentLoop();
+      stopAllAudio();
+    }, 13000);
   } catch (error) {
     log('Ending sounds failed:', error.message);
     stopSilentLoop();
+    stopAllAudio();
   }
   
-  // Handle notes/save
   const notesEnabled = get('settings.notes') !== false;
   
   if (notesEnabled) {
@@ -315,7 +268,6 @@ function completeSession(displayEl, statusEl, btnStart, btnStop) {
     saveSession(true, undefined, '');
   }
   
-  // Update UI
   if (statusEl) statusEl.textContent = t('status_complete');
   if (btnStart) {
     btnStart.disabled = false;
@@ -325,39 +277,97 @@ function completeSession(displayEl, statusEl, btnStart, btnStop) {
   if (displayEl) displayEl.textContent = formatTime(plannedDuration);
 }
 
-// Stop session
 export function stopSession(displayEl, statusEl, btnStart, btnStop) {
-  // Handle countdown stop
+  log('Stopping session...');
+  
+  // Handle countdown stop (preparation phase) - FIXED with error handling
   if (countdownInterval) {
-    clearInterval(countdownInterval);
-    countdownInterval = null;
+    log('Stopping during countdown phase');
     
-    releaseWakeLock().catch(() => {});
-    stopAudioKeepalive();
-    stopSilentLoop();
+    try {
+      clearInterval(countdownInterval);
+      countdownInterval = null;
+    } catch (e) {
+      log('Error clearing countdown interval:', e.message);
+    }
     
-    if (statusEl) statusEl.textContent = t('status_ready');
-    if (btnStart) btnStart.disabled = false;
-    if (btnStop) btnStop.disabled = true;
-    if (displayEl) displayEl.textContent = formatTime(getTotalSeconds());
+    // Safely release resources with error handling
+    try {
+      releaseWakeLock().catch(() => {});
+    } catch (e) {
+      log('Error releasing wake lock during countdown stop:', e.message);
+    }
+    
+    try {
+      stopAudioKeepalive();
+    } catch (e) {
+      log('Error stopping audio keepalive:', e.message);
+    }
+    
+    try {
+      stopSilentLoop();
+    } catch (e) {
+      log('Error stopping silent loop:', e.message);
+    }
+    
+    try {
+      stopAllAudio();
+    } catch (e) {
+      log('Error stopping audio:', e.message);
+    }
+    
+    // Reset UI safely
+    try {
+      if (statusEl) statusEl.textContent = t('status_ready');
+      if (btnStart) btnStart.disabled = false;
+      if (btnStop) btnStop.disabled = true;
+      if (displayEl) displayEl.textContent = formatTime(getTotalSeconds());
+    } catch (e) {
+      log('Error resetting UI:', e.message);
+    }
     
     return { stopped: true, early: false };
   }
   
-  if (!timerInterval) return { stopped: false };
+  // Not running
+  if (!timerInterval) {
+    log('No active timer to stop');
+    return { stopped: false };
+  }
   
+  // Stop main timer
   clearInterval(timerInterval);
   timerInterval = null;
   
   setMeditating(false);
   
-  // Release wake lock
-  releaseWakeLock().catch(() => {});
+  // Release wake lock with error handling
+  try {
+    releaseWakeLock().catch(() => {});
+  } catch (e) {
+    log('Error releasing wake lock:', e.message);
+  }
   
   // Stop audio keepalive
-  stopAudioKeepalive();
+  try {
+    stopAudioKeepalive();
+  } catch (e) {
+    log('Error stopping audio keepalive:', e.message);
+  }
   
-  stopSilentLoop();
+  // Stop silent loop
+  try {
+    stopSilentLoop();
+  } catch (e) {
+    log('Error stopping silent loop:', e.message);
+  }
+  
+  // Stop all audio
+  try {
+    stopAllAudio();
+  } catch (e) {
+    log('Error stopping audio:', e.message);
+  }
   
   const actual = Math.round((Date.now() - sessionStart) / 1000);
   
@@ -369,18 +379,21 @@ export function stopSession(displayEl, statusEl, btnStart, btnStop) {
     saveSession(false, actual, '');
   }
   
-  if (statusEl) statusEl.textContent = t('status_stopped');
-  if (btnStart) {
-    btnStart.disabled = false;
-    btnStart.textContent = t('btn_start');
+  // Update UI safely
+  try {
+    if (statusEl) statusEl.textContent = t('status_stopped');
+    if (btnStart) {
+      btnStart.disabled = false;
+      btnStart.textContent = t('btn_start');
+    }
+    if (btnStop) btnStop.disabled = true;
+    if (displayEl) displayEl.textContent = formatTime(plannedDuration);
+  } catch (e) {
+    log('Error updating UI after stop:', e.message);
   }
-  if (btnStop) btnStop.disabled = true;
-  if (displayEl) displayEl.textContent = formatTime(plannedDuration);
   
   return { stopped: true, early: true, actual };
 }
-
-// ─── Legacy NoSleep Compatibility ────────────────────────────────
 
 let noSleep = null;
 

@@ -1,36 +1,72 @@
-// ─── Silent Loop Module (iOS silent-switch bypass) ─────────────────
+// ─── Silent Loop Module ──────────────────────────────────────────
+// Keeps audio session alive for locked-screen playback on mobile devices.
 
 let silentLoop = null;
+let isRunning = false;
+let audioContextSilentSource = null;
 
-const SILENT_MP3 = 'data:audio/mpeg;base64,SUQzBAAAAAAA' +
-  'IVRSQ0sAAAAZAAAAA0xlbmd0aAAAAAAAAAAAAAAAAAAAAAAAAAD/+0DEAAAB' +
-  'aABgAAAAAA0gAAAAAAxhTEFNRTMuMTAwVVVVVVVVVVVVVVVVVVVVVVVVVVVV' +
-  'VVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVV' +
-  'VVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVV' +
-  'VVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVV' +
-  'VVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVV' +
-  'VVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVV' +
-  'VVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVV' +
-  'VVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVV' +
-  'VVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVV' +
-  'VVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVV' +
-  'VVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVV' +
-  'VVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVV';
+const DEBUG = true;
+function log(...args) {
+  if (DEBUG) console.log('[SilentLoop]', ...args);
+}
 
 export function startSilentLoop() {
-  if (!silentLoop) {
-    silentLoop = new Audio(SILENT_MP3);
-    silentLoop.loop = true;
-    silentLoop.volume = 0.01;
-    silentLoop.setAttribute('playsinline', '');
-    silentLoop.setAttribute('x-webkit-airplay', 'deny');
+  if (isRunning) {
+    return;
   }
-  silentLoop.play().catch(function(e) { console.warn('Silent loop:', e); });
+  
+  isRunning = true;
+  
+  // Use Web Audio API for silent loop (more reliable)
+  try {
+    const AudioContext = window.AudioContext || window.webkitAudioContext;
+    if (AudioContext) {
+      const ctx = new AudioContext();
+      
+      const oscillator = ctx.createOscillator();
+      const gainNode = ctx.createGain();
+      
+      oscillator.frequency.value = 1;
+      gainNode.gain.value = 0.001;
+      
+      oscillator.connect(gainNode);
+      gainNode.connect(ctx.destination);
+      
+      oscillator.start();
+      audioContextSilentSource = { oscillator, ctx };
+      
+      log('Web Audio API silent loop started');
+    }
+  } catch (e) {
+    log('Web Audio silent loop failed:', e.message);
+  }
 }
 
 export function stopSilentLoop() {
-  if (silentLoop) {
-    silentLoop.pause();
-    silentLoop.currentTime = 0;
+  isRunning = false;
+  
+  if (audioContextSilentSource) {
+    try {
+      audioContextSilentSource.oscillator.stop();
+      audioContextSilentSource.ctx.close();
+      audioContextSilentSource = null;
+    } catch (e) {
+      log('Error stopping Web Audio silent loop:', e.message);
+    }
   }
+  
+  if (silentLoop) {
+    try {
+      silentLoop.pause();
+      silentLoop.currentTime = 0;
+    } catch (e) {
+      log('Error stopping silent loop:', e.message);
+    }
+  }
+  
+  log('Silent loop stopped');
+}
+
+export function isSilentLoopRunning() {
+  return isRunning;
 }
