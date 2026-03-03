@@ -58,40 +58,74 @@ export function primeAudio(soundType) {
   log('Priming audio for:', type);
   
   try {
-    // Prime START sound
+    // Prime START sound - use muted=true for truly silent priming
     const startAudio = audioElements[type]?.start;
     if (startAudio) {
-      startAudio.volume = 0;
-      startAudio.play().then(() => {
-        startAudio.pause();
-        startAudio.currentTime = 0;
-        startAudio.volume = 1;
-        log('Start sound primed');
-      }).catch(e => log('Start prime error:', e.message));
+      startAudio.muted = true;  // Mute first
+      startAudio.volume = 0;    // Also set volume to 0
+      startAudio.currentTime = 0;
+      
+      const playPromise = startAudio.play();
+      if (playPromise !== undefined) {
+        playPromise.then(() => {
+          startAudio.pause();
+          startAudio.currentTime = 0;
+          startAudio.muted = false;  // Unmute after pause
+          startAudio.volume = 1;     // Restore volume
+          log('Start sound primed');
+        }).catch(e => {
+          log('Start prime error:', e.message);
+          // Ensure unmuted even on error
+          startAudio.muted = false;
+          startAudio.volume = 1;
+        });
+      }
     }
     
-    // Prime END sound (critical!)
+    // Prime END sound (critical!) - also muted
     const endAudio = audioElements[type]?.end;
     if (endAudio) {
+      endAudio.muted = true;
       endAudio.volume = 0;
-      endAudio.play().then(() => {
-        endAudio.pause();
-        endAudio.currentTime = 0;
-        endAudio.volume = 1;
-        log('End sound primed');
-      }).catch(e => log('End prime error:', e.message));
+      endAudio.currentTime = 0;
+      
+      const playPromise = endAudio.play();
+      if (playPromise !== undefined) {
+        playPromise.then(() => {
+          endAudio.pause();
+          endAudio.currentTime = 0;
+          endAudio.muted = false;
+          endAudio.volume = 1;
+          log('End sound primed');
+        }).catch(e => {
+          log('End prime error:', e.message);
+          endAudio.muted = false;
+          endAudio.volume = 1;
+        });
+      }
     }
     
-    // Prime INTERVAL sound
+    // Prime INTERVAL sound - also muted
     const intervalAudio = audioElements[type]?.interval;
     if (intervalAudio) {
+      intervalAudio.muted = true;
       intervalAudio.volume = 0;
-      intervalAudio.play().then(() => {
-        intervalAudio.pause();
-        intervalAudio.currentTime = 0;
-        intervalAudio.volume = 0.8;
-        log('Interval sound primed');
-      }).catch(e => log('Interval prime error:', e.message));
+      intervalAudio.currentTime = 0;
+      
+      const playPromise = intervalAudio.play();
+      if (playPromise !== undefined) {
+        playPromise.then(() => {
+          intervalAudio.pause();
+          intervalAudio.currentTime = 0;
+          intervalAudio.muted = false;
+          intervalAudio.volume = 0.8;  // Interval is quieter
+          log('Interval sound primed');
+        }).catch(e => {
+          log('Interval prime error:', e.message);
+          intervalAudio.muted = false;
+          intervalAudio.volume = 0.8;
+        });
+      }
     }
     
     isUnlocked = true;
@@ -112,6 +146,7 @@ export async function playStartSound(soundType) {
   
   try {
     audio.currentTime = 0;
+    audio.muted = false;  // Ensure not muted
     audio.volume = 1.0;
     await audio.play();
     return true;
@@ -131,6 +166,7 @@ export async function playIntervalSound(soundType) {
   
   try {
     audio.currentTime = 0;
+    audio.muted = false;
     audio.volume = 0.8;
     await audio.play();
     return true;
@@ -152,6 +188,7 @@ export async function playEndSound(soundType) {
   
   try {
     audio.currentTime = 0;
+    audio.muted = false;  // Ensure not muted
     audio.volume = 1.0;
     await audio.play();
     log('End sound playing');
@@ -173,6 +210,7 @@ export async function playSingleSound(soundType) {
   
   try {
     const audio = new Audio(src);
+    audio.muted = false;
     audio.volume = 1.0;
     await audio.play();
     return true;
@@ -193,6 +231,8 @@ export function stopIOSSession() {
       if (audio) {
         audio.pause();
         audio.currentTime = 0;
+        // Reset muted state
+        audio.muted = false;
       }
     });
   });
