@@ -2,7 +2,7 @@
 
 A minimalist meditation timer with offline audio support for iOS, Android, and desktop browsers.
 
-## Version 1.4.0
+## Version 2.2.0
 
 ## Features
 
@@ -18,6 +18,7 @@ A minimalist meditation timer with offline audio support for iOS, Android, and d
 
 ### iOS (Safari)
 1. Open the app in Safari
+2. Tap the Share button
 3. Select "Add to Home Screen"
 4. The app will appear on your home screen
 
@@ -86,6 +87,26 @@ The app uses a hybrid audio system:
 - Android Chrome 60+
 - Desktop Chrome, Firefox, Safari, Edge
 
+## Known Limitations
+
+### iOS
+- Audio cannot play if the user manually turns off the screen (iOS system restriction)
+- Screen must stay on (can dim) for audio to work
+
+### Android
+- Some OEM skins may have aggressive battery optimization
+- Users may need to disable battery optimization for the app in system settings
+
+## Development
+
+### Debug Console
+
+Open browser console to see debug logs:
+- `[App]` - Main application logs
+- `[Audio]` - Audio system logs
+- `[Timer]` - Timer logs
+- `[WakeLock]` - Wake lock logs
+- `[SilentLoop]` - Silent loop logs
 
 ### Debug Object
 
@@ -100,6 +121,9 @@ window.SilentBell = {
 }
 ```
 
+## License
+
+See [CODE_OF_CONDUCT.md](CODE_OF_CONDUCT.md)
 
 ## Credits
 

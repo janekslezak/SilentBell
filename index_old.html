@@ -1,0 +1,212 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="theme-color" content="#111820" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+  <meta name="apple-mobile-web-app-title" content="Silent Bell" />
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; media-src 'self' data:; connect-src 'self'; font-src 'self'; manifest-src 'self';" />
+  <title>Silent Bell</title>
+  <link rel="manifest" href="manifest.json" />
+  <link rel="apple-touch-icon" href="icon-192.png" />
+  <link rel="apple-touch-icon" sizes="152x152" href="icon-192.png">
+  <link rel="apple-touch-icon-precomposed" href="icon-192.png">
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+
+  <header>
+    <div class="header-left">
+      <img src="icon-192.png" alt="" class="header-icon" />
+      <span class="header-title" data-i18n="app_title">Silent Bell</span>
+    </div>
+    <div class="header-controls">
+      <button class="btn-lang" data-lang="pl">PL</button>
+      <button class="btn-lang" data-lang="ko">한</button>
+      <button id="btn-theme">☀️</button>
+    </div>
+  </header>
+
+  <nav>
+    <button class="nav-btn active" data-view="timer" data-i18n="nav_timer">Timer</button>
+    <button class="nav-btn"        data-view="log"      data-i18n="nav_log">Log</button>
+    <button class="nav-btn"        data-view="settings" data-i18n="nav_settings">Settings</button>
+  </nav>
+
+  <!-- Timer view -->
+  <div id="view-timer" class="view active">
+
+    <div id="display-wrap">
+      <div id="display">20:00</div>
+      <div id="display-arrows">
+        <button id="display-up"
+                aria-label="Increase time"
+                title="Click: +1 min · Shift+click: +1 sec">▲</button>
+        <button id="display-down"
+                aria-label="Decrease time"
+                title="Click: −1 min · Shift+click: −1 sec">▼</button>
+      </div>
+    </div>
+
+    <div id="status" data-i18n="status_ready">Ready</div>
+
+    <div class="controls">
+      <button id="btn-start" data-i18n="btn_start">Start</button>
+      <button id="btn-stop"  data-i18n="btn_stop" disabled>Stop</button>
+    </div>
+
+    <div id="note-wrap" class="note-wrap">
+      <input id="note-input" type="text" maxlength="80" class="text-input">
+      <button id="note-save-btn" class="btn-accent-outline">Save ✓</button>
+    </div>
+
+    <div class="lotus-figure">
+      <svg viewBox="0 0 100 80" xmlns="http://www.w3.org/2000/svg" class="lotus-svg">
+        <path d="M 50,60 C 44,45 44,28 50,18 C 56,28 56,45 50,60 Z"
+              fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/>
+        <path d="M 50,60 C 38,50 32,34 36,22 C 44,30 48,46 50,60 Z"
+              fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/>
+        <path d="M 50,60 C 62,50 68,34 64,22 C 56,30 52,46 50,60 Z"
+              fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/>
+        <path d="M 50,60 C 34,54 22,40 24,26 C 34,32 44,48 50,60 Z"
+              fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/>
+        <path d="M 50,60 C 66,54 78,40 76,26 C 66,32 56,48 50,60 Z"
+              fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/>
+        <path d="M 50,60 C 30,58 14,46 14,32 C 26,36 40,52 50,60 Z"
+              fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/>
+        <path d="M 50,60 C 70,58 86,46 86,32 C 74,36 60,52 50,60 Z"
+              fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/>
+        <path d="M 20,63 Q 50,70 80,63"
+              fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+      </svg>
+    </div>
+
+  </div><!-- end #view-timer -->
+
+  <!-- Log view -->
+  <div id="view-log" class="view">
+    <h2 data-i18n="nav_log">Log</h2>
+    <div id="log-summary"></div>
+    
+    <div id="log-chart"></div>
+
+    <!-- Action buttons directly under chart -->
+    <div class="log-actions">
+      <button id="btn-manual-log" data-i18n="btn_manual">+ Manual</button>
+      <button id="btn-export"     data-i18n="btn_export">Export CSV</button>
+      <button id="btn-import-csv">Import CSV</button>
+      <input  id="import-csv-file" type="file" accept=".csv" style="display:none;">
+    </div>
+
+    <!-- Manual entry form (hidden until toggled) -->
+    <div id="manual-entry" class="manual-entry">
+      <div class="manual-entry-title" data-i18n="manual_title">Log Manual Session</div>
+      <div class="manual-entry-row">
+        <input type="date"   id="manual-date"     class="text-input manual-date" />
+        <input type="time"   id="manual-time"     class="text-input manual-time" />
+        <input type="number" id="manual-duration" class="text-input manual-duration"
+               min="1" max="480" placeholder="min" />
+      </div>
+      <input type="text" id="manual-note" maxlength="80" class="text-input"
+             placeholder="Note (optional)" />
+      <div class="manual-entry-actions">
+        <button id="manual-save-btn"   class="btn-accent" data-i18n="btn_save">Save</button>
+        <button id="manual-cancel-btn" class="btn-ghost">&#10005;</button>
+      </div>
+    </div>
+
+    <ul id="log-list"></ul>
+
+    <div class="log-actions log-actions--center">
+      <center><button id="btn-clear-log" data-i18n="btn_clear">Clear Log</button></center>
+    </div>
+  </div>
+
+  <!-- Settings view -->
+  <div id="view-settings" class="view">
+    <h2 data-i18n="nav_settings">Settings</h2>
+
+    <div class="field-group">
+      <label class="field-label" data-i18n="settings_duration">Default duration (min)</label>
+      <input type="number" id="settings-duration" min="1" max="480" style="font-size:16px;" />
+    </div>
+
+    <div class="field-group">
+      <label class="field-label" data-i18n="settings_sound">Sound</label>
+      <div class="sound-row">
+        <select id="settings-sound">
+          <option value="bell"      data-i18n="sound_bell">Bell</option>
+          <option value="bell-high" data-i18n="sound_bell_high">Bell (Higher pitch)</option>
+          <option value="chugpi"    data-i18n="sound_chugpi">Jugbi 죽비</option>
+          <option value="none"      data-i18n="sound_silent">Silent</option>
+        </select>
+        <button id="btn-test-sound" type="button">▶</button>
+      </div>
+    </div>
+
+    <div class="field-group">
+      <label class="field-label" data-i18n="label_interval">Interval sound every</label>
+      <select id="interval-select">
+        <option value="0"  data-i18n="interval_none">None</option>
+        <option value="5">5 min</option>
+        <option value="10">10 min</option>
+        <option value="15">15 min</option>
+        <option value="20">20 min</option>
+      </select>
+    </div>
+
+    <div class="field-group">
+      <label class="field-label" data-i18n="settings_prepare">Prepare countdown (sec)</label>
+      <input type="number" id="settings-prepare" min="0" max="60" style="font-size:16px;" />
+    </div>
+
+    <div class="field-group">
+      <label class="field-label" data-i18n="settings_notes">Session notes</label>
+      <select id="settings-notes">
+        <option value="on"  data-i18n="notes_on">Enabled</option>
+        <option value="off" data-i18n="notes_off">Disabled</option>
+      </select>
+    </div>
+
+  </div>
+
+  <!-- iOS install banner — shown only by JS on eligible iOS devices -->
+  <div id="ios-install-banner" style="display:none">
+    <span id="ios-install-text">To install: tap
+      <svg width="16" height="16" viewBox="0 0 50 50" fill="currentColor"
+           style="vertical-align:middle;margin:0 2px">
+        <path d="M30.3 8.5 25 3.2l-5.3 5.3 1.4 1.4 3-3V32h2V6.9l3 3z"/>
+        <path d="M9 16v28h32V16H28v2h11v24H11V18h11v-2z"/>
+      </svg>
+      then "Add to Home Screen"
+    </span>
+    <button id="ios-install-close">✕</button>
+  </div>
+
+  <script src="NoSleep.min.js"></script>
+  <script type="module" src="app.js"></script>
+
+  <footer class="footer">
+    <div class="container">
+      <div class="footer-row">
+        <p>&copy; 2026 Silent Bell - v2.1.0</p>
+      </div>
+      <div class="footer-row">
+        <p>
+          <a href="https://github.com/janekslezak/SilentBell" target="_blank" rel="noopener">GitHub</a>
+          -
+          <a href="https://github.com/janekslezak/SilentBell/blob/main/CODE_OF_CONDUCT.md" target="_blank" rel="noopener">Code of Conduct</a>
+          -
+          <a href="https://github.com/janekslezak/SilentBell/blob/main/README.md" target="_blank" rel="noopener">Readme</a>
+        </p>
+      </div>
+      <div class="footer-row">
+        <p>This site is powered by <a href="https://www.netlify.com" target="_blank" rel="noopener">Netlify</a>.</p>
+      </div>
+    </div>
+  </footer>
+
+</body>
+</html>
