@@ -1,25 +1,40 @@
-/* ─── Silent Bell - Main Stylesheet ─────────────────────────────── */
+/* ─── Silent Bell - Warm Earth Tone Palette ────────────────────── */
 
 :root,
 [data-theme="dark"] {
-  --bg: #111820;
-  --surface: #1a2232;
-  --accent: #c4a77d;  /* Warm Sand - complements bronze bell */
-  --text: #eceff4;
-  --muted: #7b8fa1;
-  --danger: #bf616a;
-  --border: #2e3a4e;
+  /* Warm dark charcoal instead of blue-black */
+  --bg: #1c1b19;
+  /* Warm brown-gray surface */
+  --surface: #2a2825;
+  /* Warm Sand accent (bronze/gold) */
+  --accent: #c4a77d;
+  /* Warm off-white text */
+  --text: #f5f0e8;
+  /* Warm muted gray-brown */
+  --muted: #8b8478;
+  /* Terracotta danger (complementary to sand) */
+  --danger: #b85c4f;
+  /* Warm dark border */
+  --border: #3d3830;
   --radius: 12px;
 }
 
 [data-theme="light"] {
-  --bg: #f0ece4;
+  /* Warm light cream instead of cold gray */
+  --bg: #f5f2ed;
+  /* Warm white surface */
   --surface: #ffffff;
-  --accent: #8b7355;  /* Warm Sand for light mode */
-  --text: #2e3440;
-  --muted: #7b8fa1;
-  --danger: #bf616a;
-  --border: #d0c8be;
+  /* Darker sand for light mode */
+  --accent: #8b7355;
+  /* Warm dark charcoal text */
+  --text: #3d3a36;
+  /* Warm gray muted */
+  --muted: #8b8478;
+  /* Terracotta danger */
+  --danger: #b85c4f;
+  /* Warm light border */
+  --border: #e0d8cc;
+  --radius: 12px;
 }
 
 * {
@@ -45,18 +60,18 @@ body {
   position: relative;
   transition: background 0.3s, color 0.3s;
   
-  /* Gentle organic background */
+  /* Organic texture with warm undertones */
   background-color: var(--bg);
   background-image: 
-    radial-gradient(ellipse at 50% 30%, rgba(196, 167, 125, 0.06) 0%, transparent 50%),
+    radial-gradient(ellipse at 50% 30%, rgba(196, 167, 125, 0.08) 0%, transparent 50%),
     url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noiseFilter'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noiseFilter)' opacity='0.03'/%3E%3C/svg%3E");
   background-attachment: fixed;
 }
 
 [data-theme="light"] body {
   background-image: 
-    radial-gradient(ellipse at 50% 30%, rgba(139, 115, 85, 0.05) 0%, transparent 50%),
-    url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noiseFilter'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noiseFilter)' opacity='0.025'/%3E%3C/svg%3E");
+    radial-gradient(ellipse at 50% 30%, rgba(139, 115, 85, 0.06) 0%, transparent 50%),
+    url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noiseFilter'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noiseFilter)' opacity='0.02'/%3E%3C/svg%3E");
 }
 
 /* ─── Meditation Mode - Hide Nav & Footer ──────────────────────── */
@@ -80,18 +95,16 @@ header {
   align-items: center;
   justify-content: space-between;
   padding: 12px 16px 10px;
-  background: var(--bg);
   position: sticky;
   top: 0;
   z-index: 20;
   border-bottom: 1px solid var(--border);
   transition: background 0.3s;
-  /* Subtle warmth to complement the bronze bell icon */
-  background: linear-gradient(to bottom, var(--bg), rgba(196, 167, 125, 0.03));
+  background: linear-gradient(to bottom, var(--bg), rgba(196, 167, 125, 0.05));
 }
 
 [data-theme="dark"] header {
-  background: linear-gradient(to bottom, #111820, rgba(196, 167, 125, 0.04));
+  background: linear-gradient(to bottom, #1c1b19, rgba(196, 167, 125, 0.06));
 }
 
 .header-left {
@@ -105,20 +118,18 @@ header {
   height: 32px;
   border-radius: 6px;
   object-fit: cover;
-  /* Warm bronze tint to match the bell aesthetic */
-  filter: sepia(20%) saturate(120%) hue-rotate(10deg);
-  opacity: 0.9;
-  transition: filter 0.3s, opacity 0.3s;
+  /* Less filtering needed now that palette matches */
+  filter: sepia(10%) saturate(110%);
+  opacity: 0.95;
+  transition: opacity 0.3s;
 }
 
 .header-title {
   font-size: 1.15rem;
   font-weight: 400;
   letter-spacing: 0.5px;
-  /* Slightly warmer tone using accent */
   color: var(--accent);
   opacity: 0.95;
-  /* Elegant serif feel */
   font-family: Georgia, 'Times New Roman', serif;
 }
 
@@ -144,7 +155,7 @@ header {
 .btn-lang:hover, #btn-theme:hover {
   border-color: var(--accent);
   color: var(--accent);
-  background: rgba(196, 167, 125, 0.05);
+  background: rgba(196, 167, 125, 0.08);
 }
 
 /* ─── Navigation ───────────────────────────────────────────────── */
@@ -390,7 +401,6 @@ nav {
   color: var(--accent);
   opacity: 0.75;
   transition: color 0.3s, opacity 0.3s;
-  /* No glow effects */
   filter: none;
 }
 
@@ -647,7 +657,7 @@ nav {
 
 .log-delete-btn:hover {
   color: var(--danger);
-  background: rgba(191, 97, 106, 0.1);
+  background: rgba(184, 92, 79, 0.1);
 }
 
 /* ─── Settings ─────────────────────────────────────────────────── */
@@ -819,7 +829,6 @@ nav {
   color: var(--accent);
   letter-spacing: 2px;
   font-weight: 300;
-  /* Title case, no all-caps */
   text-transform: none;
   font-family: Georgia, 'Times New Roman', serif;
   opacity: 0.9;
