@@ -1,5 +1,5 @@
 // ─── Audio Context Module ─────────────────────────────────────────
-// Simple, reliable audio context management with iOS-specific handling.
+// Audio context management with iOS-specific handling.
 
 let audioCtx = null;
 let isUnlocked = false;
@@ -27,29 +27,36 @@ export async function unlockAudio() {
   }
 
   log('Unlocking audio...');
-  
+
   try {
     const ctx = getAudioContext();
-    
-    // iOS: Play a short silent sound to unlock
+
+    // iOS: Play a short audible sound to unlock - must be audible, not silent
     if (isIOS) {
-      const buffer = ctx.createBuffer(1, 512, ctx.sampleRate);
-      const source = ctx.createBufferSource();
-      source.buffer = buffer;
-      source.connect(ctx.destination);
-      source.start(0);
-      log('Played silent unlock sound');
+      const oscillator = ctx.createOscillator();
+      const gainNode = ctx.createGain();
+      
+      oscillator.frequency.value = 440;
+      gainNode.gain.value = 0.001; // Very quiet but audible
+      
+      oscillator.connect(gainNode);
+      gainNode.connect(ctx.destination);
+      
+      oscillator.start();
+      oscillator.stop(ctx.currentTime + 0.01); // 10ms beep
+      
+      log('Played unlock beep');
     }
-    
+
     // Resume the context
     if (ctx.state === 'suspended' || ctx.state === 'interrupted') {
       await ctx.resume();
       log('AudioContext resumed, state:', ctx.state);
     }
-    
-    isUnlocked = true;
-    log('Audio unlocked successfully');
-    
+
+    isUnlocked = ctx.state === 'running';
+    log('Audio unlocked, state:', ctx.state);
+
     return ctx;
   } catch (e) {
     log('unlockAudio error:', e.message);
@@ -61,12 +68,17 @@ export function isAudioUnlocked() {
   return isUnlocked && audioCtx?.state === 'running';
 }
 
-// Handle visibility changes
+// Handle visibility changes - try to resume when page becomes visible
 if (isIOS) {
   document.addEventListener('visibilitychange', () => {
     if (document.visibilityState === 'visible' && audioCtx?.state === 'suspended') {
-      log('Page visible, resuming AudioContext...');
-      audioCtx.resume().catch(() => {});
+      log('Page visible, attempting to resume AudioContext...');
+      audioCtx.resume().then(() => {
+        log('AudioContext resumed on visibility change, state:', audioCtx.state);
+        isUnlocked = audioCtx.state === 'running';
+      }).catch((e) => {
+        log('Failed to resume on visibility change:', e.message);
+      });
     }
   });
 }

@@ -1,9 +1,10 @@
 // ─── Silent Bell - Main Application Entry Point ──────────────────
 
-import { t, initI18n } from './modules/i18n.js';
+import { t, initI18n, setLang, getCurrentLang } from './modules/i18n.js';
 import { unlockAudio } from './modules/audio-context.js';
 import { 
   playSingleSound, 
+  playStartSound,
   preloadSoundSet, 
   stopAllAudio,
   isAudioLoading
@@ -149,15 +150,21 @@ btnStart?.addEventListener('click', async () => {
     
     const currentSound = document.getElementById('settings-sound')?.value || 'bell';
     
-    log('Unlocking audio...');
-    await unlockAudio();
-    log('Audio unlocked');
-    
-    startSilentLoop();
-    
-    log('Preloading sounds...');
-    await preloadSoundSet(currentSound);
-    log('Sounds preloaded');
+    // For iOS: Play start sound IMMEDIATELY (during user gesture)
+    // This is critical - iOS requires audio to start during user interaction
+    if (isIOS) {
+      log('iOS: Playing start sound immediately...');
+      try {
+        await playStartSound(currentSound);
+        log('iOS: Start sound played');
+      } catch (e) {
+        log('iOS: Start sound error:', e.message);
+      }
+    } else {
+      log('Unlocking audio...');
+      await unlockAudio();
+      startSilentLoop();
+    }
     
     initNoSleep();
     enableNoSleep();
@@ -169,8 +176,9 @@ btnStart?.addEventListener('click', async () => {
     
     setStartButtonLoading(false);
     
+    // Start countdown, then begin meditation session
     startCountdown(display, statusEl, btnStart, btnStop, () => {
-      startSession(display, statusEl, btnStart, btnStop, intervalSelect?.value);
+      startSession(display, statusEl, btnStart, btnStop, intervalSelect?.value, currentSound);
     });
   } catch (error) {
     log('Start session failed:', error);
@@ -299,63 +307,125 @@ let testAudioPlaying = false;
 let currentTestAudio = null;
 
 document.getElementById('btn-test-sound')?.addEventListener('click', async () => {
-  log('Test sound clicked');
+  const type = document.getElementById('settings-sound')?.value;
+  if (!type || type === 'none') return;
+  
+  log('Test sound:', type);
   
   try {
-    if (testAudioPlaying && currentTestAudio) {
-      log('Stopping test sound');
-      try {
-        currentTestAudio.pause();
-        currentTestAudio.currentTime = 0;
-      } catch (e) {}
-      testAudioPlaying = false;
-      currentTestAudio = null;
-      stopSilentLoop();
-      return;
-    }
-    
-    await unlockAudio();
-    startSilentLoop();
-    
-    const type = document.getElementById('settings-sound')?.value;
-    log('Playing test sound:', type);
-    
-    if (type && type !== 'none') {
-      const files = {
-        'bell': 'sounds/temple_bell_standard.mp3',
-        'bell-high': 'sounds/temple_bell_high.mp3',
-        'chugpi': 'sounds/chugpi.mp3'
-      };
-      
-      const src = files[type];
-      if (src) {
-        currentTestAudio = new Audio(src);
-        currentTestAudio.volume = 1.0;
-        currentTestAudio.loop = false;
-        
-        currentTestAudio.addEventListener('ended', () => {
-          testAudioPlaying = false;
-          currentTestAudio = null;
-          stopSilentLoop();
-        });
-        
-        currentTestAudio.addEventListener('error', () => {
-          testAudioPlaying = false;
-          currentTestAudio = null;
-          stopSilentLoop();
-        });
-        
-        await currentTestAudio.play();
-        testAudioPlaying = true;
-      }
-    }
+    await playSingleSound(type);
   } catch (error) {
     log('Test sound failed:', error);
-    testAudioPlaying = false;
-    currentTestAudio = null;
-    stopSilentLoop();
   }
 });
+
+// ─── Language Button ─────────────────────────────────────────────
+const langButton = document.getElementById('btn-lang');
+if (langButton) {
+  const languages = ['en', 'pl', 'ko'];
+  const langLabels = { en: 'EN', pl: 'PL', ko: 'KO' };
+  
+  langButton.addEventListener('click', async () => {
+    const currentLang = getCurrentLang();
+    const currentIndex = languages.indexOf(currentLang);
+    const nextIndex = (currentIndex + 1) % languages.length;
+    const nextLang = languages[nextIndex];
+    
+    log('Switching language from', currentLang, 'to', nextLang);
+    
+    // Unlock audio on user interaction (important for iOS)
+    try {
+      await unlockAudio();
+    } catch (e) {
+      log('Audio unlock on lang switch failed:', e.message);
+    }
+    
+    setLang(nextLang);
+    langButton.textContent = langLabels[nextLang];
+    
+    // Reload settings to update UI text
+    loadSettings(display);
+    
+    // Update status text if timer is not running
+    if (!isTimerRunning() && statusEl) {
+      statusEl.textContent = t('status_ready');
+    }
+  });
+  
+  // Set initial button text
+  langButton.textContent = langLabels[getCurrentLang()] || 'EN';
+}
+
+// ─── Theme Button ────────────────────────────────────────────────
+const themeButton = document.getElementById('btn-theme');
+if (themeButton) {
+  // Get saved theme or default to system preference
+  const getSavedTheme = () => {
+    try {
+      return localStorage.getItem('theme');
+    } catch (e) {
+      return null;
+    }
+  };
+  
+  const getSystemTheme = () => {
+    return window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
+  };
+  
+  const getCurrentTheme = () => {
+    return getSavedTheme() || getSystemTheme();
+  };
+  
+  const setTheme = (theme) => {
+    document.documentElement.setAttribute('data-theme', theme);
+    try {
+      localStorage.setItem('theme', theme);
+    } catch (e) {
+      log('Failed to save theme:', e.message);
+    }
+    
+    // Update button icon
+    if (themeButton) {
+      themeButton.textContent = theme === 'dark' ? '☀️' : '🌙';
+    }
+    
+    // Update theme-color meta tags
+    const darkMeta = document.querySelector('meta[name="theme-color"][media="(prefers-color-scheme: dark)"]');
+    const lightMeta = document.querySelector('meta[name="theme-color"][media="(prefers-color-scheme: light)"]');
+    
+    if (darkMeta && lightMeta) {
+      if (theme === 'dark') {
+        darkMeta.removeAttribute('media');
+        lightMeta.setAttribute('media', '(prefers-color-scheme: light)');
+      } else {
+        lightMeta.removeAttribute('media');
+        darkMeta.setAttribute('media', '(prefers-color-scheme: dark)');
+      }
+    }
+    
+    log('Theme set to:', theme);
+  };
+  
+  // Apply initial theme
+  const initialTheme = getCurrentTheme();
+  setTheme(initialTheme);
+  
+  themeButton.addEventListener('click', async () => {
+    const currentTheme = getCurrentTheme();
+    const newTheme = currentTheme === 'dark' ? 'light' : 'dark';
+    
+    log('Switching theme from', currentTheme, 'to', newTheme);
+    
+    // Unlock audio on user interaction (important for iOS)
+    try {
+      await unlockAudio();
+    } catch (e) {
+      log('Audio unlock on theme switch failed:', e.message);
+    }
+    
+    setTheme(newTheme);
+  });
+}
 
 (function initIOSBanner() {
   const isIos = /iphone|ipad|ipod/i.test(navigator.userAgent);

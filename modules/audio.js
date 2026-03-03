@@ -1,7 +1,16 @@
 // ─── Audio Engine Module ─────────────────────────────────────────
-// Simple MP3-based audio system for all platforms.
+// Unified audio system with iOS-specific handling.
 
-import { getAudioContext, unlockAudio } from './audio-context.js';
+import { 
+  playStartSound as playIOSStart,
+  playIntervalSound as playIOSInterval,
+  playEndSound as playIOSEnd,
+  playSingleSound as playIOSSingle,
+  stopAllAudio as stopIOSAudio,
+  startIOSSession,
+  stopIOSSession,
+  isIOSSessionActive
+} from './ios-audio.js';
 
 const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent) && !window.MSStream;
 
@@ -42,7 +51,6 @@ function getAudioElement(src) {
   if (audioCache.has(src)) {
     return audioCache.get(src);
   }
-  
   const audio = new Audio(src);
   audio.preload = 'auto';
   audio.loop = false;
@@ -53,38 +61,31 @@ function getAudioElement(src) {
 export async function preloadAudio(src) {
   return new Promise((resolve) => {
     const audio = getAudioElement(src);
-    
     if (audio.readyState >= 3) {
       resolve(audio);
       return;
     }
-    
-    const timeoutId = setTimeout(() => {
-      resolve(audio);
-    }, 5000);
-    
-    const onCanPlay = () => {
+    const timeoutId = setTimeout(() => resolve(audio), 5000);
+    audio.addEventListener('canplaythrough', () => {
       clearTimeout(timeoutId);
       resolve(audio);
-    };
-    
-    const onError = () => {
+    }, { once: true });
+    audio.addEventListener('error', () => {
       clearTimeout(timeoutId);
       resolve(audio);
-    };
-    
-    audio.addEventListener('canplaythrough', onCanPlay, { once: true });
-    audio.addEventListener('error', onError, { once: true });
+    }, { once: true });
     audio.load();
   });
 }
 
 export async function preloadSoundSet(soundType) {
+  if (isIOS) return; // iOS handles its own preloading
+  
   const files = AUDIO_FILES[soundType];
   if (!files) return;
   
   isLoading = true;
-  log('Preloading sound set:', soundType);
+  log('Preloading:', soundType);
   
   try {
     await Promise.all([
@@ -92,36 +93,20 @@ export async function preloadSoundSet(soundType) {
       preloadAudio(files.interval),
       preloadAudio(files.end)
     ]);
-    log('Sound set preloaded:', soundType);
+    log('Preloaded:', soundType);
   } catch (error) {
-    log('Preload error (non-critical):', error.message);
+    log('Preload error:', error.message);
   } finally {
     isLoading = false;
   }
 }
 
-export function stopAllAudio() {
-  audioCache.forEach(audio => {
-    try {
-      audio.pause();
-      audio.currentTime = 0;
-    } catch (e) {}
-  });
-}
-
-async function playHTML5Audio(src, volume = 1.0) {
+// Non-iOS: Simple HTML5 audio playback
+async function playStandardAudio(src, volume = 1.0) {
   try {
     const audio = getAudioElement(src);
     audio.volume = volume;
     audio.currentTime = 0;
-    
-    if (isIOS) {
-      const ctx = getAudioContext();
-      if (ctx.state === 'suspended') {
-        await ctx.resume();
-      }
-    }
-    
     await audio.play();
     log('Playing:', src);
     return true;
@@ -131,52 +116,63 @@ async function playHTML5Audio(src, volume = 1.0) {
   }
 }
 
+// Main exported functions
 export async function playStartSound(type) {
   if (type === 'none') return;
-  
-  log('Playing start sound:', type);
-  const files = AUDIO_FILES[type] || AUDIO_FILES['bell'];
+  log('playStartSound:', type);
   
   if (isIOS) {
-    await unlockAudio();
+    return await playIOSStart(type);
   }
   
-  await playHTML5Audio(files.start, 1.0);
+  const files = AUDIO_FILES[type] || AUDIO_FILES['bell'];
+  await playStandardAudio(files.start, 1.0);
 }
 
 export async function playIntervalSound(type) {
   if (type === 'none') return;
   
+  if (isIOS) {
+    return await playIOSInterval(type);
+  }
+  
   const files = AUDIO_FILES[type] || AUDIO_FILES['bell'];
-  await playHTML5Audio(files.interval, 0.8);
+  await playStandardAudio(files.interval, 0.8);
 }
 
 export async function playEndSound(type) {
   if (type === 'none') return;
-  
-  log('Playing end sound:', type);
-  const files = AUDIO_FILES[type] || AUDIO_FILES['bell'];
+  log('playEndSound:', type);
   
   if (isIOS) {
-    const ctx = getAudioContext();
-    if (ctx.state === 'suspended') {
-      await ctx.resume();
-    }
+    return await playIOSEnd(type);
   }
   
-  await playHTML5Audio(files.end, 1.0);
+  const files = AUDIO_FILES[type] || AUDIO_FILES['bell'];
+  await playStandardAudio(files.end, 1.0);
 }
 
 export async function playSingleSound(type) {
   if (type === 'none') return;
   
-  const files = AUDIO_FILES[type] || AUDIO_FILES['bell'];
-  
   if (isIOS) {
-    await unlockAudio();
+    return await playIOSSingle(type);
   }
   
-  await playHTML5Audio(files.single, 1.0);
+  const files = AUDIO_FILES[type] || AUDIO_FILES['bell'];
+  await playStandardAudio(files.single, 1.0);
 }
 
-log('Audio module loaded. Platform:', isIOS ? 'iOS' : 'Desktop');
+export function stopAllAudio() {
+  stopIOSAudio();
+  audioCache.forEach(audio => {
+    try {
+      audio.pause();
+      audio.currentTime = 0;
+    } catch (e) {}
+  });
+}
+
+export { startIOSSession, stopIOSSession, isIOSSessionActive };
+
+log('Audio module loaded, isIOS:', isIOS);

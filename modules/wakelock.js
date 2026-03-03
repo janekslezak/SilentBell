@@ -102,7 +102,12 @@ export async function acquireWakeLock() {
   isActive = true;
   startSilentLoop();
   
-  const methods = [
+  // For iOS, prioritize NoSleep.js as it works better
+  const methods = isIOS ? [
+    { name: 'nosleep', fn: acquireNoSleepWakeLock },
+    { name: 'native', fn: acquireNativeWakeLock },
+    { name: 'video', fn: acquireVideoWakeLock }
+  ] : [
     { name: 'native', fn: acquireNativeWakeLock },
     { name: 'nosleep', fn: acquireNoSleepWakeLock },
     { name: 'video', fn: acquireVideoWakeLock }

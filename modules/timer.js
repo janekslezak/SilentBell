@@ -2,18 +2,18 @@
 // Meditation timer with countdown, interval bells, and session management.
 
 import { t } from './i18n.js';
-import { getAudioContext } from './audio-context.js';
 import { 
   playStartSound, 
   playIntervalSound, 
   playEndSound,
-  preloadSoundSet,
-  stopAllAudio
+  stopAllAudio,
+  startIOSSession,
+  stopIOSSession
 } from './audio.js';
 import { startSilentLoop, stopSilentLoop } from './silent-loop.js';
 import { saveSession, showNoteField } from './log.js';
 import { state, set, get } from './state.js';
-import { acquireWakeLock, releaseWakeLock, startAudioKeepalive, stopAudioKeepalive } from './wakelock.js';
+import { acquireWakeLock, releaseWakeLock } from './wakelock.js';
 
 let timerInterval = null;
 let countdownInterval = null;
@@ -23,7 +23,6 @@ let plannedDuration = 0;
 let intervalBellMs = 0;
 let nextIntervalAt = null;
 let wakeLockAcquired = false;
-let audioKeepaliveStarted = false;
 
 const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent) && !window.MSStream;
 
@@ -116,7 +115,6 @@ export function startCountdown(displayEl, statusEl, btnStart, btnStop, onComplet
   let secsLeft = prepareSeconds;
   
   wakeLockAcquired = false;
-  audioKeepaliveStarted = false;
   
   if (secsLeft <= 0) {
     onComplete();
@@ -159,46 +157,40 @@ export function clearCountdown() {
   return false;
 }
 
-export async function startSession(displayEl, statusEl, btnStart, btnStop, intervalSelectValue) {
+export async function startSession(displayEl, statusEl, btnStart, btnStop, intervalSelectValue, currentSound) {
   intervalBellMs = parseInt(intervalSelectValue, 10) * 60 * 1000 || 0;
   plannedDuration = getTotalSeconds();
   sessionStart = Date.now();
   endTimestamp = sessionStart + plannedDuration * 1000;
   nextIntervalAt = intervalBellMs > 0 ? sessionStart + intervalBellMs : null;
   
-  log('Starting session, duration:', plannedDuration, 'seconds');
+  const sound = currentSound || get('audio.currentSound') || 'bell';
   
-  startSilentLoop();
+  log('Starting session, duration:', plannedDuration, 'sound:', sound);
   
-  const currentSound = get('audio.currentSound') || 'bell';
+  if (!isIOS) {
+    startSilentLoop();
+  }
   
-  await preloadSoundSet(currentSound);
-  
+  // Acquire wake lock
   try {
     const method = await acquireWakeLock();
     wakeLockAcquired = true;
-    log('Wake lock acquired:', method);
+    log('Wake lock:', method);
   } catch (err) {
     log('Wake lock failed:', err.message);
     wakeLockAcquired = false;
   }
   
-  if (isIOS) {
+  // For non-iOS: Play start sound now
+  // For iOS: Start sound was already played during user gesture
+  if (!isIOS) {
     try {
-      const ctx = getAudioContext();
-      startAudioKeepalive(ctx);
-      audioKeepaliveStarted = true;
-      log('iOS audio keepalive started');
-    } catch (err) {
-      log('Audio keepalive failed:', err.message);
-      audioKeepaliveStarted = false;
+      log('Playing start sound...');
+      await playStartSound(sound);
+    } catch (error) {
+      log('Start sound failed:', error.message);
     }
-  }
-  
-  try {
-    await playStartSound(currentSound);
-  } catch (error) {
-    log('Start sound failed:', error.message);
   }
   
   if (statusEl) statusEl.textContent = t('status_meditating');
@@ -249,27 +241,19 @@ async function completeSession(displayEl, statusEl, btnStart, btnStop) {
   const currentSound = get('audio.currentSound') || 'bell';
   
   try {
-    if (isIOS) {
-      const ctx = getAudioContext();
-      if (ctx.state === 'suspended') {
-        await ctx.resume();
-        log('Resumed AudioContext for end bell');
-      }
-    }
-    
     log('Playing end sound...');
     await playEndSound(currentSound);
-    log('End sound played');
-    
-    setTimeout(() => {
-      stopSilentLoop();
-      stopAllAudio();
-    }, 15000);
+    log('End sound completed');
   } catch (error) {
-    log('Ending sounds failed:', error.message);
-    stopSilentLoop();
-    stopAllAudio();
+    log('End sound failed:', error.message);
   }
+  
+  // Cleanup
+  setTimeout(() => {
+    stopSilentLoop();
+    stopIOSSession();
+    stopAllAudio();
+  }, 10000);
   
   if (wakeLockAcquired) {
     try {
@@ -278,11 +262,6 @@ async function completeSession(displayEl, statusEl, btnStart, btnStop) {
     } catch (e) {
       log('Error releasing wake lock:', e.message);
     }
-  }
-  
-  if (audioKeepaliveStarted) {
-    stopAudioKeepalive();
-    audioKeepaliveStarted = false;
   }
   
   const notesEnabled = get('settings.notes') !== false;
@@ -306,44 +285,17 @@ export function stopSession(displayEl, statusEl, btnStart, btnStop) {
   log('Stopping session...');
   
   if (countdownInterval) {
-    log('Stopping during countdown phase');
-    
-    try {
-      clearInterval(countdownInterval);
-    } catch (e) {
-      log('Error clearing countdown interval:', e.message);
-    }
+    clearInterval(countdownInterval);
     countdownInterval = null;
     
     if (wakeLockAcquired) {
-      try {
-        releaseWakeLock().catch(() => {});
-      } catch (e) {
-        log('Error releasing wake lock:', e.message);
-      }
+      releaseWakeLock().catch(() => {});
       wakeLockAcquired = false;
     }
     
-    if (audioKeepaliveStarted) {
-      try {
-        stopAudioKeepalive();
-      } catch (e) {
-        log('Error stopping audio keepalive:', e.message);
-      }
-      audioKeepaliveStarted = false;
-    }
-    
-    try {
-      stopSilentLoop();
-    } catch (e) {
-      log('Error stopping silent loop:', e.message);
-    }
-    
-    try {
-      stopAllAudio();
-    } catch (e) {
-      log('Error stopping audio:', e.message);
-    }
+    stopSilentLoop();
+    stopIOSSession();
+    stopAllAudio();
     
     if (statusEl) statusEl.textContent = t('status_ready');
     if (btnStart) btnStart.disabled = false;
@@ -354,7 +306,6 @@ export function stopSession(displayEl, statusEl, btnStart, btnStop) {
   }
   
   if (!timerInterval) {
-    log('No active timer to stop');
     return { stopped: false };
   }
   
@@ -364,37 +315,15 @@ export function stopSession(displayEl, statusEl, btnStart, btnStop) {
   setMeditating(false);
   
   if (wakeLockAcquired) {
-    try {
-      releaseWakeLock().catch(() => {});
-    } catch (e) {
-      log('Error releasing wake lock:', e.message);
-    }
+    releaseWakeLock().catch(() => {});
     wakeLockAcquired = false;
   }
   
-  if (audioKeepaliveStarted) {
-    try {
-      stopAudioKeepalive();
-    } catch (e) {
-      log('Error stopping audio keepalive:', e.message);
-    }
-    audioKeepaliveStarted = false;
-  }
-  
-  try {
-    stopSilentLoop();
-  } catch (e) {
-    log('Error stopping silent loop:', e.message);
-  }
-  
-  try {
-    stopAllAudio();
-  } catch (e) {
-    log('Error stopping audio:', e.message);
-  }
+  stopSilentLoop();
+  stopIOSSession();
+  stopAllAudio();
   
   const actual = Math.round((Date.now() - sessionStart) / 1000);
-  
   const notesEnabled = get('settings.notes') !== false;
   
   if (notesEnabled) {
