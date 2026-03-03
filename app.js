@@ -5,7 +5,7 @@ import { unlockAudio } from './modules/audio-context.js';
 import { 
   playSingleSound, 
   playStartSound,
-  playSilentUnlock,
+  primeAudio,
   preloadSoundSet, 
   stopAllAudio,
   isAudioLoading
@@ -138,20 +138,50 @@ function setStartButtonLoading(loading) {
   }
 }
 
-// iOS handler - SYNCHRONOUS unlock
+// iOS handler: Prime the specific audio element during user gesture
 function handleIOSStart(e) {
   if (isStarting || btnStart.disabled) {
     log('Start already in progress, ignoring');
     return;
   }
   
-  log('iOS Start: Synchronous unlock');
+  log('iOS Start: Priming audio');
   
-  // CRITICAL: Call unlock synchronously (no await!)
-  playSilentUnlock();
+  const currentSound = document.getElementById('settings-sound')?.value || 'bell';
   
-  // Then proceed with async operations
-  processStart();
+  // CRITICAL: Prime the audio element (play/pause) during user gesture
+  // This unlocks the specific audio element for later use
+  primeAudio(currentSound);
+  
+  // Continue with async operations
+  processStart(currentSound);
+}
+
+async function processStart(currentSound) {
+  try {
+    isStarting = true;
+    setStartButtonLoading(true);
+    statusEl.textContent = t('status_preparing') || 'Preparing...';
+    
+    startSilentLoop();
+    initNoSleep();
+    enableNoSleep();
+    
+    const timerState = getTimerState();
+    setSessionStart(Date.now());
+    setPlannedDuration(getTotalSeconds());
+    setCurrentSoundForLog(timerState.currentSound);
+    
+    setStartButtonLoading(false);
+    
+    startCountdown(display, statusEl, btnStart, btnStop, () => {
+      startSession(display, statusEl, btnStart, btnStop, intervalSelect?.value, currentSound);
+    });
+  } catch (error) {
+    log('Start error:', error);
+    setStartButtonLoading(false);
+    statusEl.textContent = t('status_error') || 'Error';
+  }
 }
 
 // Standard handler for non-iOS
@@ -191,40 +221,9 @@ async function handleStandardStart() {
   }
 }
 
-// Common async processing for iOS
-async function processStart() {
-  try {
-    isStarting = true;
-    setStartButtonLoading(true);
-    statusEl.textContent = t('status_preparing') || 'Preparing...';
-    
-    const currentSound = document.getElementById('settings-sound')?.value || 'bell';
-    
-    startSilentLoop();
-    initNoSleep();
-    enableNoSleep();
-    
-    const timerState = getTimerState();
-    setSessionStart(Date.now());
-    setPlannedDuration(getTotalSeconds());
-    setCurrentSoundForLog(timerState.currentSound);
-    
-    setStartButtonLoading(false);
-    
-    startCountdown(display, statusEl, btnStart, btnStop, () => {
-      startSession(display, statusEl, btnStart, btnStop, intervalSelect?.value, currentSound);
-    });
-  } catch (error) {
-    log('Start error:', error);
-    setStartButtonLoading(false);
-    statusEl.textContent = t('status_error') || 'Error';
-  }
-}
-
 // Attach handlers
 if (btnStart) {
   if (isIOS) {
-    // iOS needs both touchstart (for immediate response) and click
     btnStart.addEventListener('touchstart', handleIOSStart, { passive: false });
     btnStart.addEventListener('click', handleIOSStart);
   } else {
@@ -378,7 +377,6 @@ if (langButton) {
     
     log('Switching language from', currentLang, 'to', nextLang);
     
-    // Unlock audio on user interaction (important for iOS)
     try {
       await unlockAudio();
     } catch (e) {
@@ -388,23 +386,19 @@ if (langButton) {
     setLang(nextLang);
     langButton.textContent = langLabels[nextLang];
     
-    // Reload settings to update UI text
     loadSettings(display);
     
-    // Update status text if timer is not running
     if (!isTimerRunning() && statusEl) {
       statusEl.textContent = t('status_ready');
     }
   });
   
-  // Set initial button text
   langButton.textContent = langLabels[getCurrentLang()] || 'EN';
 }
 
 // ─── Theme Button ────────────────────────────────────────────────
 const themeButton = document.getElementById('btn-theme');
 if (themeButton) {
-  // Get saved theme or default to system preference
   const getSavedTheme = () => {
     try {
       return localStorage.getItem('theme');
@@ -429,12 +423,10 @@ if (themeButton) {
       log('Failed to save theme:', e.message);
     }
     
-    // Update button icon
     if (themeButton) {
       themeButton.textContent = theme === 'dark' ? '☀️' : '🌙';
     }
     
-    // Update theme-color meta tags
     const darkMeta = document.querySelector('meta[name="theme-color"][media="(prefers-color-scheme: dark)"]');
     const lightMeta = document.querySelector('meta[name="theme-color"][media="(prefers-color-scheme: light)"]');
     
@@ -451,7 +443,6 @@ if (themeButton) {
     log('Theme set to:', theme);
   };
   
-  // Apply initial theme
   const initialTheme = getCurrentTheme();
   setTheme(initialTheme);
   
@@ -461,7 +452,6 @@ if (themeButton) {
     
     log('Switching theme from', currentTheme, 'to', newTheme);
     
-    // Unlock audio on user interaction (important for iOS)
     try {
       await unlockAudio();
     } catch (e) {

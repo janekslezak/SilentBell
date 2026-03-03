@@ -6,7 +6,7 @@ import {
   playIntervalSound as playIOSInterval,
   playEndSound as playIOSEnd,
   playSingleSound as playIOSSingle,
-  unlockIOSAudio,
+  primeAudio as primeIOSAudio,
   stopAllAudio as stopIOSAudio,
   startIOSSession,
   stopIOSSession,
@@ -80,7 +80,7 @@ export async function preloadAudio(src) {
 }
 
 export async function preloadSoundSet(soundType) {
-  if (isIOS) return; // iOS handles its own preloading
+  if (isIOS) return;
   
   const files = AUDIO_FILES[soundType];
   if (!files) return;
@@ -102,7 +102,6 @@ export async function preloadSoundSet(soundType) {
   }
 }
 
-// Non-iOS: Simple HTML5 audio playback
 async function playStandardAudio(src, volume = 1.0) {
   try {
     const audio = getAudioElement(src);
@@ -117,12 +116,13 @@ async function playStandardAudio(src, volume = 1.0) {
   }
 }
 
-// Export iOS unlock function
-export function playSilentUnlock() {
-  unlockIOSAudio();
+// New function: Prime the audio for iOS
+export function primeAudio(soundType) {
+  if (isIOS) {
+    primeIOSAudio(soundType);
+  }
 }
 
-// Main exported functions
 export async function playStartSound(type) {
   if (type === 'none') return;
   log('playStartSound:', type);
@@ -180,5 +180,10 @@ export function stopAllAudio() {
 }
 
 export { startIOSSession, stopIOSSession, isIOSSessionActive };
+
+// Legacy compatibility
+export function playSilentUnlock() {
+  // No-op, use primeAudio instead
+}
 
 log('Audio module loaded, isIOS:', isIOS);

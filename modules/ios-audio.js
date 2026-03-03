@@ -1,5 +1,5 @@
 // ─── iOS Audio Module ─────────────────────────────────────────────
-// Safari iOS compatible audio using persistent elements.
+// Safari iOS compatible audio - prime the specific audio element during unlock.
 
 const DEBUG = true;
 function log(...args) {
@@ -29,82 +29,59 @@ const SOUNDS = {
   }
 };
 
-// CRITICAL: Persistent audio elements for Safari iOS
-// Structure: audioPool['bell']['start'] = AudioElement
-const audioPool = {};
-let unlockAudio = null;
+// Persistent audio elements
+const audioElements = {};
+let currentSoundType = 'bell';
 let isUnlocked = false;
 
-// Initialize audio elements immediately
+// Initialize audio elements
 function initAudioElements() {
   if (!isIOS) return;
   
   log('Initializing audio elements...');
   
-  // Create unlock audio (silent)
-  unlockAudio = new Audio();
-  unlockAudio.src = 'data:audio/wav;base64,UklGRigAAABXQVZFZm10IBIAAAABAAEARKwAAIhYAQACABAAAABkYXRhAgAAAAEA//uQZAA==';
-  unlockAudio.preload = 'auto';
-  
-  // Create pool for each sound type
   Object.keys(SOUNDS).forEach(type => {
-    audioPool[type] = {};
+    audioElements[type] = {};
     ['start', 'interval', 'end'].forEach(key => {
       const audio = new Audio();
       audio.src = SOUNDS[type][key];
       audio.preload = 'auto';
-      audio.load();
-      audioPool[type][key] = audio;
+      audioElements[type][key] = audio;
     });
   });
-  
-  log('Audio elements initialized');
 }
 
-// SYNCHRONOUS unlock - must be called directly in click handler
-export function unlockIOSAudio() {
-  if (!isIOS || isUnlocked) return;
+// CRITICAL: Prime the audio element during user gesture
+// We play and immediately pause to unlock it, then play it later
+export function primeAudio(soundType) {
+  if (!isIOS) return;
   
-  log('iOS: Synchronous unlock...');
+  currentSoundType = soundType || 'bell';
+  log('Priming audio for:', currentSoundType);
   
   try {
-    // Play the unlock audio synchronously
-    if (unlockAudio) {
-      unlockAudio.volume = 0.01;
-      unlockAudio.currentTime = 0;
-      unlockAudio.play().catch(() => {});
-    }
+    const startAudio = audioElements[currentSoundType]?.start;
+    if (!startAudio) return;
     
-    isUnlocked = true;
-    log('iOS: Audio unlocked');
+    // Play and immediately pause to unlock this specific element
+    // This satisfies Safari's "user gesture" requirement
+    startAudio.volume = 0; // Mute it for the unlock
+    const playPromise = startAudio.play();
+    
+    if (playPromise !== undefined) {
+      playPromise.then(() => {
+        // Immediately pause and reset
+        startAudio.pause();
+        startAudio.currentTime = 0;
+        startAudio.volume = 1; // Restore volume
+        isUnlocked = true;
+        log('Audio primed successfully');
+      }).catch(e => {
+        log('Prime error:', e.message);
+      });
+    }
   } catch (e) {
-    log('iOS: Unlock error:', e.message);
-  }
-}
-
-// Play sound using the persistent audio element
-async function playPooledSound(type, key, volume = 1.0) {
-  if (!isIOS) return false;
-  if (!isUnlocked) {
-    log('Audio not unlocked yet!');
-    return false;
-  }
-  
-  const audio = audioPool[type]?.[key];
-  if (!audio) {
-    log('No pooled audio for', type, key);
-    return false;
-  }
-  
-  try {
-    // Reset and play
-    audio.volume = volume;
-    audio.currentTime = 0;
-    await audio.play();
-    return true;
-  } catch (error) {
-    log('Play error:', error.message);
-    return false;
+    log('Prime exception:', e.message);
   }
 }
 
@@ -112,32 +89,64 @@ export async function playStartSound(soundType) {
   if (!isIOS) return false;
   if (soundType === 'none') return true;
   
-  const type = soundType || 'bell';
+  const type = soundType || currentSoundType;
   log('playStartSound:', type);
   
-  const result = await playPooledSound(type, 'start', 1.0);
-  if (result) log('Start sound OK');
-  return result;
+  const audio = audioElements[type]?.start;
+  if (!audio) return false;
+  
+  try {
+    // Reset and play
+    audio.currentTime = 0;
+    audio.volume = 1.0;
+    await audio.play();
+    log('Start sound playing');
+    return true;
+  } catch (error) {
+    log('Start sound failed:', error.message);
+    return false;
+  }
 }
 
 export async function playIntervalSound(soundType) {
   if (!isIOS) return false;
   if (soundType === 'none') return true;
   
-  const type = soundType || 'bell';
-  return await playPooledSound(type, 'interval', 0.8);
+  const type = soundType || currentSoundType;
+  const audio = audioElements[type]?.interval;
+  if (!audio) return false;
+  
+  try {
+    audio.currentTime = 0;
+    audio.volume = 0.8;
+    await audio.play();
+    return true;
+  } catch (error) {
+    log('Interval sound failed:', error.message);
+    return false;
+  }
 }
 
 export async function playEndSound(soundType) {
   if (!isIOS) return false;
   if (soundType === 'none') return true;
   
-  const type = soundType || 'bell';
+  const type = soundType || currentSoundType;
   log('playEndSound:', type);
   
-  const result = await playPooledSound(type, 'end', 1.0);
-  if (result) log('End sound OK');
-  return result;
+  const audio = audioElements[type]?.end;
+  if (!audio) return false;
+  
+  try {
+    audio.currentTime = 0;
+    audio.volume = 1.0;
+    await audio.play();
+    log('End sound playing');
+    return true;
+  } catch (error) {
+    log('End sound failed:', error.message);
+    return false;
+  }
 }
 
 export async function playSingleSound(soundType) {
@@ -149,7 +158,6 @@ export async function playSingleSound(soundType) {
   
   log('playSingleSound:', type);
   
-  // For test sound, create new audio (no need to pool this one)
   try {
     const audio = new Audio(src);
     audio.volume = 1.0;
@@ -161,14 +169,17 @@ export async function playSingleSound(soundType) {
   }
 }
 
-// No-op functions for API compatibility
+// For compatibility with old API
+export function playSilentUnlock() {
+  // Deprecated, use primeAudio instead
+}
+
 export async function startIOSSession() { return true; }
 export function stopIOSSession() {
-  // Stop all pooled audio
-  Object.keys(audioPool).forEach(type => {
-    Object.keys(audioPool[type]).forEach(key => {
-      const audio = audioPool[type][key];
-      if (audio && audio.pause) {
+  Object.keys(audioElements).forEach(type => {
+    ['start', 'interval', 'end'].forEach(key => {
+      const audio = audioElements[type][key];
+      if (audio) {
         audio.pause();
         audio.currentTime = 0;
       }
