@@ -29,38 +29,32 @@ const SOUNDS = {
   }
 };
 
-// CRITICAL: Safari iOS requires persistent audio elements
-// We create them upfront and reuse the same elements
-const audioPool = {
-  start: null,
-  interval: null,
-  end: null,
-  unlock: null
-};
-
+// CRITICAL: Persistent audio elements for Safari iOS
+// Structure: audioPool['bell']['start'] = AudioElement
+const audioPool = {};
+let unlockAudio = null;
 let isUnlocked = false;
 
-// Initialize audio elements immediately (but don't play yet)
+// Initialize audio elements immediately
 function initAudioElements() {
   if (!isIOS) return;
   
+  log('Initializing audio elements...');
+  
   // Create unlock audio (silent)
-  audioPool.unlock = new Audio();
-  audioPool.unlock.src = 'data:audio/wav;base64,UklGRigAAABXQVZFZm10IBIAAAABAAEARKwAAIhYAQACABAAAABkYXRhAgAAAAEA//uQZAA==';
-  audioPool.unlock.preload = 'auto';
+  unlockAudio = new Audio();
+  unlockAudio.src = 'data:audio/wav;base64,UklGRigAAABXQVZFZm10IBIAAAABAAEARKwAAIhYAQACABAAAABkYXRhAgAAAAEA//uQZAA==';
+  unlockAudio.preload = 'auto';
   
   // Create pool for each sound type
   Object.keys(SOUNDS).forEach(type => {
-    if (!audioPool[type]) {
-      audioPool[type] = {};
-    }
+    audioPool[type] = {};
     ['start', 'interval', 'end'].forEach(key => {
-      if (!audioPool[type][key]) {
-        audioPool[type][key] = new Audio();
-        audioPool[type][key].src = SOUNDS[type][key];
-        audioPool[type][key].preload = 'auto';
-        audioPool[type][key].load();
-      }
+      const audio = new Audio();
+      audio.src = SOUNDS[type][key];
+      audio.preload = 'auto';
+      audio.load();
+      audioPool[type][key] = audio;
     });
   });
   
@@ -75,21 +69,11 @@ export function unlockIOSAudio() {
   
   try {
     // Play the unlock audio synchronously
-    if (audioPool.unlock) {
-      audioPool.unlock.volume = 0.01;
-      audioPool.unlock.play().catch(() => {});
+    if (unlockAudio) {
+      unlockAudio.volume = 0.01;
+      unlockAudio.currentTime = 0;
+      unlockAudio.play().catch(() => {});
     }
-    
-    // Also try to preload/play all sounds to ensure they're ready
-    Object.keys(SOUNDS).forEach(type => {
-      ['start', 'interval', 'end'].forEach(key => {
-        const audio = audioPool[type]?.[key];
-        if (audio) {
-          // Load but don't play yet
-          audio.load();
-        }
-      });
-    });
     
     isUnlocked = true;
     log('iOS: Audio unlocked');
@@ -107,7 +91,10 @@ async function playPooledSound(type, key, volume = 1.0) {
   }
   
   const audio = audioPool[type]?.[key];
-  if (!audio) return false;
+  if (!audio) {
+    log('No pooled audio for', type, key);
+    return false;
+  }
   
   try {
     // Reset and play
@@ -117,19 +104,6 @@ async function playPooledSound(type, key, volume = 1.0) {
     return true;
   } catch (error) {
     log('Play error:', error.message);
-    // Fallback: try creating new audio
-    return playFallback(SOUNDS[type][key], volume);
-  }
-}
-
-// Fallback if pooled audio fails
-async function playFallback(src, volume = 1.0) {
-  try {
-    const audio = new Audio(src);
-    audio.volume = volume;
-    await audio.play();
-    return true;
-  } catch (e) {
     return false;
   }
 }
@@ -175,7 +149,7 @@ export async function playSingleSound(soundType) {
   
   log('playSingleSound:', type);
   
-  // For test sound, we can try pooled or fallback
+  // For test sound, create new audio (no need to pool this one)
   try {
     const audio = new Audio(src);
     audio.volume = 1.0;
@@ -191,18 +165,14 @@ export async function playSingleSound(soundType) {
 export async function startIOSSession() { return true; }
 export function stopIOSSession() {
   // Stop all pooled audio
-  Object.values(audioPool).forEach(pool => {
-    if (pool && typeof pool === 'object' && pool.pause) {
-      pool.pause();
-      pool.currentTime = 0;
-    } else if (pool && typeof pool === 'object') {
-      Object.values(pool).forEach(audio => {
-        if (audio && audio.pause) {
-          audio.pause();
-          audio.currentTime = 0;
-        }
-      });
-    }
+  Object.keys(audioPool).forEach(type => {
+    Object.keys(audioPool[type]).forEach(key => {
+      const audio = audioPool[type][key];
+      if (audio && audio.pause) {
+        audio.pause();
+        audio.currentTime = 0;
+      }
+    });
   });
 }
 export function stopAllAudio() {

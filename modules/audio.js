@@ -117,11 +117,9 @@ async function playStandardAudio(src, volume = 1.0) {
   }
 }
 
-// Synchronous unlock for iOS Safari
+// Export iOS unlock function
 export function playSilentUnlock() {
-  if (isIOS) {
-    unlockIOSAudio();
-  }
+  unlockIOSAudio();
 }
 
 // Main exported functions

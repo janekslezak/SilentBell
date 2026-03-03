@@ -5,7 +5,7 @@ import { unlockAudio } from './modules/audio-context.js';
 import { 
   playSingleSound, 
   playStartSound,
-  unlockIOSAudio,
+  playSilentUnlock,
   preloadSoundSet, 
   stopAllAudio,
   isAudioLoading
@@ -138,60 +138,32 @@ function setStartButtonLoading(loading) {
   }
 }
 
-// CRITICAL SAFARI FIX: The unlock must happen SYNCHRONOUSLY in the event handler
-// with ZERO async operations before it
+// iOS handler - SYNCHRONOUS unlock
 function handleIOSStart(e) {
-  // Prevent default to ensure we control the timing
-  if (e.type === 'touchstart') e.preventDefault();
-  
-  if (isStarting || btnStart.disabled) return;
+  if (isStarting || btnStart.disabled) {
+    log('Start already in progress, ignoring');
+    return;
+  }
   
   log('iOS Start: Synchronous unlock');
   
-  // SYNCHRONOUS unlock - call immediately, no await!
-  unlockIOSAudio();
+  // CRITICAL: Call unlock synchronously (no await!)
+  playSilentUnlock();
   
-  // Start the async process after unlocking
+  // Then proceed with async operations
   processStart();
-}
-
-async function processStart() {
-  try {
-    isStarting = true;
-    setStartButtonLoading(true);
-    statusEl.textContent = t('status_preparing') || 'Preparing...';
-    
-    const currentSound = document.getElementById('settings-sound')?.value || 'bell';
-    
-    startSilentLoop();
-    initNoSleep();
-    enableNoSleep();
-    
-    const timerState = getTimerState();
-    setSessionStart(Date.now());
-    setPlannedDuration(getTotalSeconds());
-    setCurrentSoundForLog(timerState.currentSound);
-    
-    setStartButtonLoading(false);
-    
-    // Start countdown
-    startCountdown(display, statusEl, btnStart, btnStop, () => {
-      // When countdown ends, play the bell
-      startSession(display, statusEl, btnStart, btnStop, intervalSelect?.value, currentSound);
-    });
-  } catch (error) {
-    log('Start error:', error);
-    setStartButtonLoading(false);
-    statusEl.textContent = t('status_error') || 'Error';
-  }
 }
 
 // Standard handler for non-iOS
 async function handleStandardStart() {
-  if (isStarting || btnStart.disabled) return;
+  if (isStarting || btnStart.disabled) {
+    log('Start already in progress, ignoring');
+    return;
+  }
   
   try {
     log('Standard start');
+    isStarting = true;
     setStartButtonLoading(true);
     statusEl.textContent = t('status_preparing') || 'Preparing...';
     
@@ -215,13 +187,44 @@ async function handleStandardStart() {
   } catch (error) {
     log('Start error:', error);
     setStartButtonLoading(false);
+    statusEl.textContent = t('status_error') || 'Error';
+  }
+}
+
+// Common async processing for iOS
+async function processStart() {
+  try {
+    isStarting = true;
+    setStartButtonLoading(true);
+    statusEl.textContent = t('status_preparing') || 'Preparing...';
+    
+    const currentSound = document.getElementById('settings-sound')?.value || 'bell';
+    
+    startSilentLoop();
+    initNoSleep();
+    enableNoSleep();
+    
+    const timerState = getTimerState();
+    setSessionStart(Date.now());
+    setPlannedDuration(getTotalSeconds());
+    setCurrentSoundForLog(timerState.currentSound);
+    
+    setStartButtonLoading(false);
+    
+    startCountdown(display, statusEl, btnStart, btnStop, () => {
+      startSession(display, statusEl, btnStart, btnStop, intervalSelect?.value, currentSound);
+    });
+  } catch (error) {
+    log('Start error:', error);
+    setStartButtonLoading(false);
+    statusEl.textContent = t('status_error') || 'Error';
   }
 }
 
 // Attach handlers
 if (btnStart) {
   if (isIOS) {
-    // iOS needs touchstart for immediate response, and click as backup
+    // iOS needs both touchstart (for immediate response) and click
     btnStart.addEventListener('touchstart', handleIOSStart, { passive: false });
     btnStart.addEventListener('click', handleIOSStart);
   } else {
