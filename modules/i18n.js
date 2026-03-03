@@ -1,329 +1,211 @@
 // ─── i18n Module ─────────────────────────────────────────────────
-// Internationalization with central state integration.
+// Internationalization support for multiple languages.
 
-import { state, set, get } from './state.js';
-
-const STRINGS = {
+const translations = {
   en: {
-    app_title:         'Silent Bell',
-    nav_timer:         'Timer',
-    nav_log:           'Log',
-    nav_settings:      'Settings',
-    status_ready:      'Ready',
-    status_meditating: 'Meditating…',
-    status_complete:   'Session complete 🙏',
-    status_stopped:    'Stopped early',
-    status_prepare:    'Prepare… {secs}s',
-    status_error:      'Error starting session',
-    status_audio_interrupted: 'Audio interrupted - tap to resume',
-    status_loading:    'Loading',
-    status_preparing:  'Preparing audio…',
-    label_sound:       'Sound',
-    label_interval:    'Interval sound every',
-    sound_bell:        'Bell',
-    sound_bell_high:   'Bell (Higher pitch)',
-    sound_chugpi:      'Jugbi 죽비',
-    sound_silent:      'Silent',
-    interval_none:     'None',
-    btn_start:         'Start',
-    btn_stop:          'Stop',
-    btn_export:        'Export CSV',
-    btn_clear:         'Clear Log',
-    btn_save:          'Save',
+    nav_timer: 'Timer',
+    nav_log: 'Log',
+    nav_settings: 'Settings',
+    btn_start: 'Start',
+    btn_stop: 'Stop',
+    btn_save: 'Save',
+    btn_clear: 'Clear Log',
+    btn_export: 'Export CSV',
+    btn_import: 'Import CSV',
+    btn_manual: 'Log Manual Session',
+    btn_test: 'Test Sound',
+    status_ready: 'Ready',
+    status_loading: 'Loading...',
+    status_preparing: 'Preparing audio...',
+    status_meditating: 'Meditating...',
+    status_complete: 'Session complete 🙏',
+    status_stopped: 'Stopped early',
+    status_prepare: 'Prepare... {secs}s',
+    status_error: 'Error - tap to retry',
     settings_duration: 'Default duration (min)',
-    settings_sound:    'Sound',
-    settings_prepare:  'Prepare countdown (sec)',
-    settings_notes:    'Session notes',
-    notes_on:          'Enabled',
-    notes_off:         'Disabled',
-    settings_saved:    'Saved ✓',
-    settings_quota_error: 'Storage full. Some settings may not be saved.',
-    log_sessions:      'Sessions',
-    log_total:         'Total time',
-    log_completed:     'Completed',
-    log_planned:       'planned',
-    log_stopped:       '⚠ stopped early',
-    confirm_clear:     'Clear all session history?',
-    ios_install:       'To install: tap the Share button ↑ then "Add to Home Screen"',
-    log_streak:        'Streak',
-    log_days:          'days',
-    note_placeholder:  'Note (optional)',
-    note_save:         'Save ✓',
-    btn_manual:        '+ Manual Add',
-    manual_title:      'Log Manual Session',
-    manual_saved:      'Session saved ✓',
-    manual_err_dur:    'Please enter a valid duration.',
-    log_manual:        '✎ manual',
-    log_avg_daily:     'Avg daily',
-    chart_last7:       'Last 7 days',
-    chart_avg_weekday: 'Avg / Weekday',
-    chart_avg_label:   'average',
-    import_success:    'Imported {count} sessions from CSV.',
-    import_error:      'Could not import CSV: ',
-    save_error:        'Failed to save session',
-    export_error:      'Failed to export'
+    settings_sound: 'Sound',
+    settings_interval: 'Interval bell (min)',
+    settings_prepare: 'Prepare countdown (sec)',
+    settings_notes: 'Session notes',
+    notes_on: 'Enabled',
+    notes_off: 'Disabled',
+    sound_bell: 'Temple Bell',
+    sound_bell_high: 'High Bell',
+    sound_chugpi: 'Chugpi',
+    sound_none: 'None',
+    interval_none: 'None',
+    log_sessions: 'Sessions',
+    log_total: 'Total',
+    log_completed: 'Completed',
+    log_planned: 'planned',
+    log_stopped: '(stopped)',
+    log_manual: 'manual',
+    log_days: 'days',
+    log_avg_daily: 'Avg daily',
+    chart_last7: 'Last 7 days',
+    chart_avg_weekday: 'Avg / weekday',
+    note_placeholder: 'How was your session?',
+    note_save: 'Save',
+    manual_title: 'Log Manual Session',
+    manual_saved: 'Session saved',
+    manual_err_dur: 'Please enter a valid duration',
+    confirm_clear: 'Clear all session history? This cannot be undone.',
+    confirm_delete: 'Delete this session? This cannot be undone.',
+    export_success: 'Exported {count} sessions to CSV',
+    export_error: 'Nothing to export',
+    import_success: 'Imported {count} sessions from CSV',
+    import_error: 'Could not import CSV',
+    ios_install: 'To install: tap Share then "Add to Home Screen"'
   },
   pl: {
-    app_title:         'Dzwon Ciszy',
-    nav_timer:         'Timer',
-    nav_log:           'Dziennik',
-    nav_settings:      'Ustawienia',
-    status_ready:      'Gotowy',
-    status_meditating: 'Medytacja…',
-    status_complete:   'Sesja zakończona 🙏',
-    status_stopped:    'Przerwano',
-    status_prepare:    'Przygotuj się… {secs}s',
-    status_error:      'Błąd uruchamiania sesji',
-    status_audio_interrupted: 'Dźwięk przerwany - dotknij, aby wznowić',
-    status_loading:    'Ładowanie',
-    status_preparing:  'Przygotowywanie dźwięku…',
-    label_sound:       'Dźwięk',
-    label_interval:    'Dźwięk co każde',
-    sound_bell:        'Dzwon',
-    sound_bell_high:   'Dzwon (Wyższy dźwięk)',
-    sound_chugpi:      'Jugbi 죽비',
-    sound_silent:      'Cisza',
-    interval_none:     'Brak',
-    btn_start:         'Start',
-    btn_stop:          'Stop',
-    btn_export:        'Eksport CSV',
-    btn_clear:         'Wyczyść',
-    btn_save:          'Zapisz',
+    nav_timer: 'Timer',
+    nav_log: 'Dziennik',
+    nav_settings: 'Ustawienia',
+    btn_start: 'Start',
+    btn_stop: 'Stop',
+    btn_save: 'Zapisz',
+    btn_clear: 'Wyczyść dziennik',
+    btn_export: 'Eksport CSV',
+    btn_import: 'Import CSV',
+    btn_manual: 'Dodaj ręcznie',
+    btn_test: 'Testuj dźwięk',
+    status_ready: 'Gotowy',
+    status_loading: 'Ładowanie...',
+    status_preparing: 'Przygotowywanie dźwięku...',
+    status_meditating: 'Medytacja...',
+    status_complete: 'Sesja zakończona 🙏',
+    status_stopped: 'Przerwano',
+    status_prepare: 'Przygotuj się... {secs}s',
+    status_error: 'Błąd - dotknij, aby spróbować',
     settings_duration: 'Domyślny czas (min)',
-    settings_sound:    'Dźwięk',
-    settings_prepare:  'Odliczanie przed startem (s)',
-    settings_notes:    'Notatki sesji',
-    notes_on:          'Włączone',
-    notes_off:         'Wyłączone',
-    settings_saved:    'Zapisano ✓',
-    settings_quota_error: 'Pamięć pełna. Niektóre ustawienia mogą nie zostać zapisane.',
-    log_sessions:      'Sesje',
-    log_total:         'Łączny czas',
-    log_completed:     'Ukończone',
-    log_planned:       'zaplanowano',
-    log_stopped:       '⚠ przerwano',
-    confirm_clear:     'Wyczyścić historię sesji?',
-    ios_install:       'Aby zainstalować: wybierz Udostępnij ↑, potem „Dodaj do ekranu głównego"',
-    log_streak:        'Seria',
-    log_days:          'dni',
-    note_placeholder:  'Notatka (opcjonalna)',
-    note_save:         'Zapisz ✓',
-    btn_manual:        '+ Dodaj Ręcznie',
-    manual_title:      'Dodaj sesję ręcznie',
-    manual_saved:      'Sesja zapisana ✓',
-    manual_err_dur:    'Podaj prawidłowy czas trwania.',
-    log_manual:        '✎ ręcznie',
-    log_avg_daily:     'Śr. dzienna',
-    chart_last7:       'Ostatnie 7 dni',
-    chart_avg_weekday: 'Średnia / Dzień Tygodnia',
-    chart_avg_label:   'średnia',
-    import_success:    'Zaimportowano {count} sesji z CSV.',
-    import_error:      'Nie można zaimportować CSV: ',
-    save_error:        'Nie udało się zapisać sesji',
-    export_error:      'Eksport nie powiódł się'
+    settings_sound: 'Dźwięk',
+    settings_interval: 'Dzwonek co (min)',
+    settings_prepare: 'Odliczanie (sek)',
+    settings_notes: 'Notatki',
+    notes_on: 'Włączone',
+    notes_off: 'Wyłączone',
+    sound_bell: 'Dzwon świątynny',
+    sound_bell_high: 'Wysoki dzwon',
+    sound_chugpi: 'Chugpi',
+    sound_none: 'Brak',
+    interval_none: 'Brak',
+    log_sessions: 'Sesje',
+    log_total: 'Razem',
+    log_completed: 'Ukończone',
+    log_planned: 'planowane',
+    log_stopped: '(przerwane)',
+    log_manual: 'ręcznie',
+    log_days: 'dni',
+    log_avg_daily: 'Śr. dzienna',
+    chart_last7: 'Ostatnie 7 dni',
+    chart_avg_weekday: 'Śr. / dzień tyg.',
+    note_placeholder: 'Jak przebiegła sesja?',
+    note_save: 'Zapisz',
+    manual_title: 'Dodaj sesję ręcznie',
+    manual_saved: 'Sesja zapisana',
+    manual_err_dur: 'Podaj prawidłowy czas',
+    confirm_clear: 'Wyczyścić całą historię? Tej operacji nie można cofnąć.',
+    confirm_delete: 'Usunąć tę sesję? Tej operacji nie można cofnąć.',
+    export_success: 'Wyeksportowano {count} sesji do CSV',
+    export_error: 'Nic do wyeksportowania',
+    import_success: 'Zaimportowano {count} sesji z CSV',
+    import_error: 'Nie udało się zaimportować CSV',
+    ios_install: 'Aby zainstalować: dotknij Udostępnij, potem "Dodaj do ekranu głównego"'
   },
   ko: {
-    app_title:         '침묵의 종',
-    nav_timer:         '타이머',
-    nav_log:           '기록',
-    nav_settings:      '설정',
-    status_ready:      '준비',
-    status_meditating: '명상 중…',
-    status_complete:   '세션 완료 🙏',
-    status_stopped:    '중단됨',
-    status_prepare:    '준비하세요… {secs}초',
-    status_error:      '세션 시작 오류',
-    status_audio_interrupted: '오디오 중단됨 - 재개하려면 탭하세요',
-    status_loading:    '로딩 중',
-    status_preparing:  '오디오 준비 중…',
-    label_sound:       '소리',
-    label_interval:    '간격 소리 (매)',
-    sound_bell:        '범종',
-    sound_bell_high:   '범종 (높은 음)',
-    sound_chugpi:      '죽비',
-    sound_silent:      '무음',
-    interval_none:     '없음',
-    btn_start:         '시작',
-    btn_stop:          '정지',
-    btn_export:        'CSV 날보기',
-    btn_clear:         '기록 삭제',
-    btn_save:          '저장',
+    nav_timer: '타이머',
+    nav_log: '기록',
+    nav_settings: '설정',
+    btn_start: '시작',
+    btn_stop: '중지',
+    btn_save: '저장',
+    btn_clear: '기록 삭제',
+    btn_export: 'CSV 낳기',
+    btn_import: 'CSV 가져오기',
+    btn_manual: '수동 기록',
+    btn_test: '소리 테스트',
+    status_ready: '준비',
+    status_loading: '로딩 중...',
+    status_preparing: '오디오 준비 중...',
+    status_meditating: '명상 중...',
+    status_complete: '세션 완료 🙏',
+    status_stopped: '중단됨',
+    status_prepare: '준비하세요... {secs}초',
+    status_error: '오류 - 재시도하려면 탭하세요',
     settings_duration: '기본 시간 (분)',
-    settings_sound:    '소리',
-    settings_prepare:  '준비 카운트다운 (초)',
-    settings_notes:    '세션 메모',
-    notes_on:          '활성화',
-    notes_off:         '비활성화',
-    settings_saved:    '저장됨 ✓',
-    settings_quota_error: '저장 공간이 부족합니다. 일부 설정이 저장되지 않을 수 있습니다.',
-    log_sessions:      '세션',
-    log_total:         '총 시간',
-    log_completed:     '완료',
-    log_planned:       '계획',
-    log_stopped:       '⚠ 중단됨',
-    confirm_clear:     '모든 세션 기록을 삭제하시겠습니까?',
-    ios_install:       '설치하려면: 공유 버튼을 탭한 후 "홈 화면에 추가"를 선택하세요',
-    log_streak:        '연속',
-    log_days:          '일',
-    note_placeholder:  '메모 (선택)',
-    note_save:         '저장 ✓',
-    btn_manual:        '+ 수동 입력',
-    manual_title:      '수동 세션 기록',
-    manual_saved:      '세션 저장됨 ✓',
-    manual_err_dur:    '올바른 시간을 입력하세요.',
-    log_manual:        '✎ 수동',
-    log_avg_daily:     '일일 평균',
-    chart_last7:       '최근 7일',
-    chart_avg_weekday: '요일 평균',
-    chart_avg_label:   '평균',
-    import_success:    'CSV에서 {count}개의 세션을 가져왔습니다.',
-    import_error:      'CSV를 가져올 수 없습니다: ',
-    save_error:        '세션 저장 실패',
-    export_error:      '날볼 수 없습니다'
+    settings_sound: '소리',
+    settings_interval: '간격 벨 (분)',
+    settings_prepare: '준비 카운트다운 (초)',
+    settings_notes: '세션 메모',
+    notes_on: '사용',
+    notes_off: '사용 안함',
+    sound_bell: '절 종',
+    sound_bell_high: '높은 종',
+    sound_chugpi: 'Chugpi',
+    sound_none: '없음',
+    interval_none: '없음',
+    log_sessions: '세션',
+    log_total: '총계',
+    log_completed: '완료',
+    log_planned: '계획',
+    log_stopped: '(중단)',
+    log_manual: '수동',
+    log_days: '일',
+    log_avg_daily: '일일 평균',
+    chart_last7: '최근 7일',
+    chart_avg_weekday: '요일별 평균',
+    note_placeholder: '세션은 어땠나요?',
+    note_save: '저장',
+    manual_title: '수동 세션 기록',
+    manual_saved: '세션이 저장되었습니다',
+    manual_err_dur: '유효한 시간을 입력하세요',
+    confirm_clear: '모든 기록을 삭제하시겠습니까? 이 작업은 취소할 수 없습니다.',
+    confirm_delete: '이 세션을 삭제하시겠습니까? 이 작업은 취소할 수 없습니다.',
+    export_success: '{count}개 세션을 CSV로 낳았습니다',
+    export_error: '낳을 내용이 없습니다',
+    import_success: 'CSV에서 {count}개 세션을 가져왔습니다',
+    import_error: 'CSV를 가져올 수 없습니다',
+    ios_install: '설치하려면: 공유를 탭한 후 "홈 화면에 추가"를 선택하세요'
   }
 };
 
-let currentLang = 'en';
-let currentTheme = 'dark';
+let currentLang = localStorage.getItem('lang') || 'en';
 
-function initFromStorage() {
-  const stateLang = get('settings.language');
-  const stateTheme = get('settings.theme');
-  
-  if (stateLang && STRINGS[stateLang]) {
-    currentLang = stateLang;
-  } else {
-    const legacyLang = localStorage.getItem('lang');
-    if (legacyLang && STRINGS[legacyLang]) {
-      currentLang = legacyLang;
-    }
-  }
-  
-  if (stateTheme) {
-    currentTheme = stateTheme;
-  } else {
-    const legacyTheme = localStorage.getItem('theme');
-    if (legacyTheme) {
-      currentTheme = legacyTheme;
-    }
-  }
+// Ensure currentLang is valid
+if (!translations[currentLang]) {
+  currentLang = 'en';
 }
 
-export function t(key, replacements = {}) {
-  let text = (STRINGS[currentLang] && STRINGS[currentLang][key])
-      || (STRINGS['en'] && STRINGS['en'][key])
-      || key;
-  
-  for (const [placeholder, value] of Object.entries(replacements)) {
-    text = text.replace(`{${placeholder}}`, value);
-  }
-  
-  return text;
+export function t(key) {
+  return translations[currentLang]?.[key] || translations.en[key] || key;
 }
 
-export function getCurrentLang() { return currentLang; }
+export function getCurrentLang() {
+  return currentLang;
+}
 
-export function setCurrentLang(lang) { 
-  if (STRINGS[lang]) {
+export function setLang(lang) {
+  if (translations[lang]) {
     currentLang = lang;
-    set('settings.language', lang);
-    state.saveToStorage();
+    localStorage.setItem('lang', lang);
+    updatePageText();
   }
 }
 
-export function getCurrentTheme() { return currentTheme; }
-
-export function setCurrentTheme(theme) { 
-  if (theme === 'dark' || theme === 'light') {
-    currentTheme = theme;
-    set('settings.theme', theme);
-    state.saveToStorage();
-  }
-}
-
-export function applyLang() {
-  document.documentElement.lang = currentLang;
-  
+function updatePageText() {
   document.querySelectorAll('[data-i18n]').forEach(el => {
     const key = el.dataset.i18n;
-    if (key) {
-      el.textContent = t(key);
-    }
+    if (key) el.textContent = t(key);
   });
-  
-  document.querySelectorAll('[data-i18n-placeholder]').forEach(el => {
-    const key = el.dataset.i18nPlaceholder;
-    if (key) {
-      el.placeholder = t(key);
-    }
-  });
-  
-  const allLangs = ['en', 'pl', 'ko'];
-  const otherLangs = allLangs.filter(l => l !== currentLang);
-  const langDisplay = { en: 'EN', pl: 'PL', ko: '한' };
-  
-  document.querySelectorAll('.btn-lang').forEach((btn, i) => {
-    if (otherLangs[i]) {
-      btn.dataset.lang = otherLangs[i];
-      btn.textContent = langDisplay[otherLangs[i]];
-    }
-  });
-}
-
-export function applyTheme() {
-  document.documentElement.setAttribute('data-theme', currentTheme);
-  
-  const btnTheme = document.getElementById('btn-theme');
-  if (btnTheme) {
-    btnTheme.textContent = currentTheme === 'dark' ? '☀️' : '🌙';
-  }
-  
-  const meta = document.querySelector('meta[name="theme-color"]');
-  if (meta) {
-    meta.content = currentTheme === 'dark' ? '#111820' : '#f0ece4';
-  }
 }
 
 export function initI18n() {
-  initFromStorage();
-  
-  applyLang();
-  applyTheme();
-  
-  document.querySelectorAll('.btn-lang').forEach(btn => {
-    btn.addEventListener('click', () => {
-      const newLang = btn.dataset.lang;
-      if (newLang && STRINGS[newLang]) {
-        currentLang = newLang;
-        set('settings.language', newLang);
-        state.saveToStorage();
-        applyLang();
-      }
-    });
-  });
-  
-  const btnTheme = document.getElementById('btn-theme');
-  if (btnTheme) {
-    btnTheme.addEventListener('click', () => {
-      currentTheme = currentTheme === 'dark' ? 'light' : 'dark';
-      set('settings.theme', currentTheme);
-      state.saveToStorage();
-      applyTheme();
-    });
+  // Ensure valid language
+  if (!translations[currentLang]) {
+    currentLang = 'en';
+    localStorage.setItem('lang', 'en');
   }
+  updatePageText();
 }
 
-export function getAvailableLanguages() {
-  return Object.keys(STRINGS);
-}
-
-export function hasTranslation(key, lang = currentLang) {
-  return !!(STRINGS[lang] && STRINGS[lang][key]);
-}
-
-export function addTranslations(lang, translations) {
-  if (!STRINGS[lang]) {
-    STRINGS[lang] = {};
-  }
-  Object.assign(STRINGS[lang], translations);
-}
+export { translations };

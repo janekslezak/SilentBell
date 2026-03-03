@@ -41,7 +41,6 @@ export function loadSettings(displayEl) {
     settingsRefs.notes.value = notes ? 'on' : 'off';
   }
   
-  // Update timer display
   if (displayEl) {
     const totalSeconds = duration * 60;
     const m = String(Math.floor(totalSeconds / 60)).padStart(2, '0');
@@ -49,7 +48,6 @@ export function loadSettings(displayEl) {
     displayEl.textContent = `${m}:${s}`;
   }
   
-  // Update state
   set('timer.selectedMinutes', duration);
   set('timer.selectedSeconds', 0);
   set('timer.prepareSeconds', prepare);
@@ -57,7 +55,6 @@ export function loadSettings(displayEl) {
 }
 
 export function setupSettingsListeners(displayEl) {
-  // Duration
   if (settingsRefs.duration) {
     settingsRefs.duration.addEventListener('change', () => {
       const value = parseInt(settingsRefs.duration.value, 10);
@@ -77,7 +74,6 @@ export function setupSettingsListeners(displayEl) {
     });
   }
   
-  // Sound
   if (settingsRefs.sound) {
     settingsRefs.sound.addEventListener('change', () => {
       const value = settingsRefs.sound.value;
@@ -87,7 +83,6 @@ export function setupSettingsListeners(displayEl) {
     });
   }
   
-  // Prepare
   if (settingsRefs.prepare) {
     settingsRefs.prepare.addEventListener('change', () => {
       const value = parseInt(settingsRefs.prepare.value, 10);
@@ -99,7 +94,6 @@ export function setupSettingsListeners(displayEl) {
     });
   }
   
-  // Interval
   if (settingsRefs.interval) {
     settingsRefs.interval.addEventListener('change', () => {
       const value = parseInt(settingsRefs.interval.value, 10);
@@ -108,7 +102,6 @@ export function setupSettingsListeners(displayEl) {
     });
   }
   
-  // Notes
   if (settingsRefs.notes) {
     settingsRefs.notes.addEventListener('change', () => {
       const value = settingsRefs.notes.value === 'on';

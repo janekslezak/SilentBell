@@ -2,7 +2,6 @@
 // Simple MP3-based audio system for all platforms.
 
 import { getAudioContext, unlockAudio } from './audio-context.js';
-import { startSilentLoop, stopSilentLoop } from './silent-loop.js';
 
 const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent) && !window.MSStream;
 
@@ -46,6 +45,7 @@ function getAudioElement(src) {
   
   const audio = new Audio(src);
   audio.preload = 'auto';
+  audio.loop = false;
   audioCache.set(src, audio);
   return audio;
 }
@@ -115,7 +115,6 @@ async function playHTML5Audio(src, volume = 1.0) {
     audio.volume = volume;
     audio.currentTime = 0;
     
-    // iOS: ensure audio context is running
     if (isIOS) {
       const ctx = getAudioContext();
       if (ctx.state === 'suspended') {
@@ -136,8 +135,6 @@ export async function playStartSound(type) {
   if (type === 'none') return;
   
   log('Playing start sound:', type);
-  startSilentLoop();
-  
   const files = AUDIO_FILES[type] || AUDIO_FILES['bell'];
   
   if (isIOS) {
@@ -158,13 +155,8 @@ export async function playEndSound(type) {
   if (type === 'none') return;
   
   log('Playing end sound:', type);
-  
   const files = AUDIO_FILES[type] || AUDIO_FILES['bell'];
   
-  // Ensure silent loop is running for locked screen
-  startSilentLoop();
-  
-  // On iOS, try to ensure audio context is active
   if (isIOS) {
     const ctx = getAudioContext();
     if (ctx.state === 'suspended') {

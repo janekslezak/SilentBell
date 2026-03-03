@@ -1,5 +1,4 @@
 /* ─── Silent Bell - Main Stylesheet ─────────────────────────────── */
-/* Using legacy Nordic color palette */
 
 :root,
 [data-theme="dark"] {
@@ -11,8 +10,6 @@
   --danger: #bf616a;
   --border: #2e3a4e;
   --radius: 12px;
-  --saved-color: #88c0d0;
-  --monk-color: #3a5a6a;
 }
 
 [data-theme="light"] {
@@ -23,8 +20,6 @@
   --muted: #7b8fa1;
   --danger: #bf616a;
   --border: #d0c8be;
-  --saved-color: #4a7c8e;
-  --monk-color: #c4b8ae;
 }
 
 * {
@@ -52,7 +47,6 @@ body {
   transition: background 0.3s, color 0.3s;
 }
 
-/* Header */
 header {
   display: flex;
   align-items: center;
@@ -110,7 +104,6 @@ header {
   color: var(--accent);
 }
 
-/* Navigation */
 nav {
   display: flex;
   background: var(--surface);
@@ -144,7 +137,6 @@ nav {
   border-bottom: 2px solid var(--accent);
 }
 
-/* Views */
 .view {
   display: none;
   padding: 24px 20px;
@@ -158,7 +150,6 @@ nav {
   display: flex;
 }
 
-/* Timer Display - Updated layout with arrows on right */
 #display-wrap {
   display: flex;
   flex-direction: row;
@@ -187,7 +178,6 @@ nav {
   pointer-events: none;
 }
 
-/* Arrows now on the right side */
 #display-arrows {
   display: flex;
   flex-direction: column;
@@ -215,7 +205,6 @@ nav {
   color: var(--accent);
 }
 
-/* Status */
 #status {
   text-align: center;
   color: var(--muted);
@@ -224,7 +213,6 @@ nav {
   min-height: 24px;
 }
 
-/* Controls */
 .controls {
   display: flex;
   justify-content: center;
@@ -255,20 +243,6 @@ nav {
   opacity: 0.9;
 }
 
-#btn-stop {
-  background: var(--danger);
-  color: #fff;
-}
-
-#btn-stop:hover:not(:disabled) {
-  opacity: 0.9;
-}
-
-#btn-start:disabled, #btn-stop:disabled {
-  opacity: 0.35;
-  pointer-events: none;
-}
-
 #btn-start.loading {
   opacity: 0.8;
   cursor: wait;
@@ -293,7 +267,20 @@ nav {
   to { transform: rotate(360deg); }
 }
 
-/* Note Wrap */
+#btn-stop {
+  background: var(--danger);
+  color: #fff;
+}
+
+#btn-stop:hover:not(:disabled) {
+  opacity: 0.9;
+}
+
+#btn-start:disabled, #btn-stop:disabled {
+  opacity: 0.35;
+  pointer-events: none;
+}
+
 .note-wrap {
   display: none;
   flex-direction: column;
@@ -336,7 +323,6 @@ nav {
   color: var(--bg);
 }
 
-/* Lotus Figure */
 .lotus-figure {
   display: none;
   justify-content: center;
@@ -352,7 +338,6 @@ nav {
   transition: color 0.3s, opacity 0.3s;
 }
 
-/* Log View - Old Style */
 #view-log h2 {
   text-align: center;
   margin-bottom: 20px;
@@ -383,7 +368,6 @@ nav {
   border-radius: var(--radius);
 }
 
-/* Chart toggle buttons */
 .chart-toggle-btn {
   transition: all 0.2s ease;
   -webkit-tap-highlight-color: transparent;
@@ -398,7 +382,6 @@ nav {
   font-weight: 500;
 }
 
-/* Log Actions */
 .log-actions {
   display: flex;
   flex-wrap: wrap;
@@ -450,7 +433,6 @@ nav {
   min-width: 140px;
 }
 
-/* Manual Entry */
 .manual-entry {
   display: none;
   flex-direction: column;
@@ -496,6 +478,23 @@ nav {
   flex: 0 0 auto;
 }
 
+.manual-note {
+  width: 100%;
+  padding: 10px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: var(--bg);
+  color: var(--text);
+  font-family: inherit;
+  font-size: 15px;
+  margin-top: 4px;
+}
+
+.manual-note:focus {
+  outline: none;
+  border-color: var(--accent);
+}
+
 .manual-entry-actions {
   display: flex;
   gap: 8px;
@@ -527,7 +526,6 @@ nav {
   touch-action: manipulation;
 }
 
-/* Log List - Old Style */
 #log-list {
   list-style: none;
   display: flex;
@@ -560,12 +558,31 @@ nav {
   margin-top: 3px;
 }
 
-.log-manual-badge {
-  opacity: 0.6;
-  font-size: 0.8em;
+.log-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 8px;
 }
 
-/* Settings View */
+.log-delete-btn {
+  background: none;
+  border: none;
+  color: var(--muted);
+  font-size: 1.2rem;
+  line-height: 1;
+  padding: 4px 8px;
+  cursor: pointer;
+  border-radius: 4px;
+  transition: color 0.2s, background 0.2s;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.log-delete-btn:hover {
+  color: var(--danger);
+  background: rgba(191, 97, 106, 0.1);
+}
+
 #view-settings h2 {
   text-align: center;
   margin-bottom: 24px;
@@ -622,50 +639,24 @@ nav {
 
 #btn-test-sound {
   flex-shrink: 0;
-  padding: 12px 18px;
+  padding: 10px 14px;
   background: var(--surface);
   border: 1px solid var(--border);
   border-radius: var(--radius);
   color: var(--accent);
-  font-size: 1rem;
+  font-size: 1.2rem;
+  line-height: 1;
   cursor: pointer;
   touch-action: manipulation;
   -webkit-tap-highlight-color: transparent;
-  transition: border-color 0.15s, color 0.15s;
+  transition: border-color 0.15s, background 0.15s;
 }
 
 #btn-test-sound:hover {
   border-color: var(--accent);
+  background: var(--bg);
 }
 
-/* Settings rows */
-.setting-row {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  background: var(--surface);
-  padding: 14px 16px;
-  border-radius: var(--radius);
-  transition: background 0.3s;
-}
-
-.setting-row label {
-  flex: 1;
-  font-size: 0.9rem;
-  color: var(--muted);
-  cursor: default;
-}
-
-.setting-row select,
-.setting-row input[type="number"] {
-  width: auto;
-  flex-shrink: 0;
-  min-width: 100px;
-  padding: 8px 12px;
-  font-size: 0.95rem;
-}
-
-/* iOS Install Banner */
 #ios-install-banner {
   position: fixed;
   bottom: 20px;
@@ -696,13 +687,12 @@ nav {
   background: none;
   border: none;
   color: var(--muted);
-  font-size: 1rem;
+  font-size: 1.5rem;
   cursor: pointer;
   padding: 4px 6px;
   flex-shrink: 0;
 }
 
-/* iOS Loading Screen */
 #ios-loading-screen {
   position: fixed;
   top: 0;
@@ -758,7 +748,6 @@ nav {
   font-weight: 300;
 }
 
-/* Meditation active state */
 #view-timer.meditating {
   align-items: center;
   justify-content: flex-start;
@@ -781,7 +770,7 @@ nav {
 }
 
 @keyframes lotus-pulse {
-  0%, 100% { opacity: 0.75; transform: scale(1);    }
+  0%, 100% { opacity: 0.75; transform: scale(1); }
   50%       { opacity: 0.35; transform: scale(0.96); }
 }
 
@@ -799,12 +788,15 @@ nav {
   padding: 16px 0;
 }
 
-/* Footer */
 .footer {
   margin-top: auto;
   padding: 20px;
   text-align: center;
   border-top: 1px solid var(--border);
+}
+
+.footer .container {
+  max-width: 100%;
 }
 
 .footer-row {
@@ -813,17 +805,16 @@ nav {
   color: var(--muted);
 }
 
-.footer a {
+.footer-row a {
   color: var(--muted);
   text-decoration: underline;
   text-underline-offset: 3px;
 }
 
-.footer a:hover {
+.footer-row a:hover {
   color: var(--accent);
 }
 
-/* Safe Area Support for Notched Devices */
 @supports (padding-top: env(safe-area-inset-top)) {
   body {
     padding-top: env(safe-area-inset-top);
@@ -843,7 +834,6 @@ nav {
   }
 }
 
-/* Small screens */
 @media (max-width: 375px) {
   #display {
     font-size: 4rem;
@@ -869,7 +859,6 @@ nav {
   }
 }
 
-/* Responsive */
 @media (max-width: 480px) {
   #display {
     font-size: 4rem;
@@ -890,7 +879,6 @@ nav {
   }
 }
 
-/* Reduced Motion */
 @media (prefers-reduced-motion: reduce) {
   *,
   *::before,

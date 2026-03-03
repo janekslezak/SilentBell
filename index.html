@@ -1,104 +1,58 @@
 <!DOCTYPE html>
-<html lang="en" data-theme="dark">
+<html lang="en">
 <head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
-  <meta name="theme-color" content="#111820" />
-  <meta name="background-color" content="#111820" />
-  
-  <!-- iOS PWA Support -->
-  <meta name="apple-mobile-web-app-capable" content="yes" />
-  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
-  <meta name="apple-mobile-web-app-title" content="Silent Bell" />
-  
-  <!-- iOS Splash Screen Images -->
-  <link rel="apple-touch-icon" href="icon-192.png" />
-  <link rel="apple-touch-icon" sizes="152x152" href="icon-192.png" />
-  <link rel="apple-touch-icon" sizes="180x180" href="icon-192.png" />
-  <link rel="apple-touch-icon" sizes="167x167" href="icon-192.png" />
-  <link rel="apple-touch-icon-precomposed" href="icon-192.png" />
-  
-  <!-- iOS Splash Screen (iPhone) -->
-  <link rel="apple-touch-startup-image" href="icon-512.png" media="(device-width: 320px) and (device-height: 568px) and (-webkit-device-pixel-ratio: 2)" />
-  <link rel="apple-touch-startup-image" href="icon-512.png" media="(device-width: 375px) and (device-height: 667px) and (-webkit-device-pixel-ratio: 2)" />
-  <link rel="apple-touch-startup-image" href="icon-512.png" media="(device-width: 375px) and (device-height: 812px) and (-webkit-device-pixel-ratio: 3)" />
-  <link rel="apple-touch-startup-image" href="icon-512.png" media="(device-width: 414px) and (device-height: 736px) and (-webkit-device-pixel-ratio: 3)" />
-  <link rel="apple-touch-startup-image" href="icon-512.png" media="(device-width: 414px) and (device-height: 896px) and (-webkit-device-pixel-ratio: 2)" />
-  <link rel="apple-touch-startup-image" href="icon-512.png" media="(device-width: 414px) and (device-height: 896px) and (-webkit-device-pixel-ratio: 3)" />
-  
-  <!-- iOS Splash Screen (iPad) -->
-  <link rel="apple-touch-startup-image" href="icon-512.png" media="(device-width: 768px) and (device-height: 1024px) and (-webkit-device-pixel-ratio: 2)" />
-  <link rel="apple-touch-startup-image" href="icon-512.png" media="(device-width: 834px) and (device-height: 1112px) and (-webkit-device-pixel-ratio: 2)" />
-  <link rel="apple-touch-startup-image" href="icon-512.png" media="(device-width: 834px) and (device-height: 1194px) and (-webkit-device-pixel-ratio: 2)" />
-  <link rel="apple-touch-startup-image" href="icon-512.png" media="(device-width: 1024px) and (device-height: 1366px) and (-webkit-device-pixel-ratio: 2)" />
-  
-  <meta name="format-detection" content="telephone=no" />
-  
-  <title>Silent Bell</title>
-  <link rel="manifest" href="manifest.json" />
-  <link rel="stylesheet" href="style.css" />
-  
-  <!-- Preload critical audio files -->
-  <link rel="preload" href="sounds/sequence_bell_start.mp3" as="audio" />
-  <link rel="preload" href="sounds/sequence_bell_interval.mp3" as="audio" />
-  <link rel="preload" href="sounds/sequence_bell_end.mp3" as="audio" />
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="theme-color" content="#111820" media="(prefers-color-scheme: dark)">
+  <meta name="theme-color" content="#f0ece4" media="(prefers-color-scheme: light)">
+  <title>Silent Bell - Meditation Timer</title>
+  <link rel="manifest" href="manifest.json">
+  <link rel="apple-touch-icon" href="icon-192.png">
+  <link rel="icon" type="image/png" href="icon-192.png">
+  <link rel="stylesheet" href="style.css">
+  <script src="NoSleep.min.js"></script>
 </head>
 <body>
-
-  <!-- iOS Loading Screen Overlay -->
-  <div id="ios-loading-screen" style="display: none;">
-    <div class="ios-loading-content">
-      <img src="icon-192.png" alt="Silent Bell" class="ios-loading-icon" />
-      <div class="ios-loading-spinner"></div>
-      <p class="ios-loading-text">Silent Bell</p>
-    </div>
-  </div>
-
   <header>
     <div class="header-left">
-      <img src="icon-192.png" alt="" class="header-icon" />
-      <span class="header-title" data-i18n="app_title">Silent Bell</span>
+      <img src="icon-192.png" alt="Silent Bell" class="header-icon">
+      <span class="header-title">Silent Bell</span>
     </div>
     <div class="header-controls">
-      <button class="btn-lang" data-lang="pl">PL</button>
-      <button class="btn-lang" data-lang="ko">한</button>
-      <button id="btn-theme">☀️</button>
+      <button id="btn-lang" class="btn-lang" aria-label="Change language">EN</button>
+      <button id="btn-theme" aria-label="Toggle theme">🌙</button>
     </div>
   </header>
 
   <nav>
     <button class="nav-btn active" data-view="timer" data-i18n="nav_timer">Timer</button>
-    <button class="nav-btn"        data-view="log"      data-i18n="nav_log">Log</button>
-    <button class="nav-btn"        data-view="settings" data-i18n="nav_settings">Settings</button>
+    <button class="nav-btn" data-view="log" data-i18n="nav_log">Log</button>
+    <button class="nav-btn" data-view="settings" data-i18n="nav_settings">Settings</button>
   </nav>
 
-  <!-- Timer view -->
-  <div id="view-timer" class="view active">
-
+  <main id="view-timer" class="view active">
     <div id="display-wrap">
       <div id="display">20:00</div>
       <div id="display-arrows">
-        <button id="display-up"
-                aria-label="Increase time"
-                title="Click: +1 min · Shift+click: +1 sec">▲</button>
-        <button id="display-down"
-                aria-label="Decrease time"
-                title="Click: −1 min · Shift+click: −1 sec">▼</button>
+        <button id="display-up" aria-label="Increase time">▲</button>
+        <button id="display-down" aria-label="Decrease time">▼</button>
       </div>
     </div>
-
+    
     <div id="status" data-i18n="status_ready">Ready</div>
-
+    
     <div class="controls">
       <button id="btn-start" data-i18n="btn_start">Start</button>
-      <button id="btn-stop"  data-i18n="btn_stop" disabled>Stop</button>
+      <button id="btn-stop" disabled data-i18n="btn_stop">Stop</button>
     </div>
-
-    <div id="note-wrap" class="note-wrap">
-      <input id="note-input" type="text" maxlength="80" class="text-input">
-      <button id="note-save-btn" class="btn-accent-outline">Save ✓</button>
+    
+    <div id="note-wrap" class="note-wrap" style="display:none;">
+      <input type="text" id="note-input" placeholder="How was your session?" maxlength="200">
+      <button id="note-save-btn" class="btn-accent-outline" data-i18n="note_save">Save</button>
     </div>
-
+    
     <div class="lotus-figure">
       <svg viewBox="0 0 100 80" xmlns="http://www.w3.org/2000/svg" class="lotus-svg">
         <path d="M 50,60 C 44,45 44,28 50,18 C 56,28 56,45 50,60 Z"
@@ -119,109 +73,101 @@
               fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
       </svg>
     </div>
+  </main>
 
-  </div><!-- end #view-timer -->
-
-  <!-- Log view -->
-  <div id="view-log" class="view">
-    <h2 data-i18n="nav_log">Log</h2>
-    <div id="log-summary"></div>
+  <main id="view-log" class="view">
+    <h2 data-i18n="nav_log">Session Log</h2>
     
+    <div id="log-summary"></div>
     <div id="log-chart"></div>
-
+    
     <div class="log-actions">
-      <button id="btn-manual-log" data-i18n="btn_manual">+ Manual</button>
-      <button id="btn-export"     data-i18n="btn_export">Export CSV</button>
-      <button id="btn-import-csv">Import CSV</button>
-      <input  id="import-csv-file" type="file" accept=".csv" style="display:none;">
+      <button id="btn-export" data-i18n="btn_export">Export CSV</button>
+      <button id="btn-import-csv" data-i18n="btn_import">Import CSV</button>
+      <input type="file" id="import-csv-file" accept=".csv" style="display:none;">
+      <button id="btn-manual-log" data-i18n="btn_manual">Log Manual Session</button>
     </div>
-
-    <div id="manual-entry" class="manual-entry">
+    
+    <div id="manual-entry" class="manual-entry" style="display:none;">
       <div class="manual-entry-title" data-i18n="manual_title">Log Manual Session</div>
       <div class="manual-entry-row">
-        <input type="date"   id="manual-date"     class="text-input manual-date" />
-        <input type="time"   id="manual-time"     class="text-input manual-time" />
-        <input type="number" id="manual-duration" class="text-input manual-duration"
-               min="1" max="480" placeholder="min" />
+        <input type="date" id="manual-date" class="manual-date">
+        <input type="time" id="manual-time" class="manual-time">
+        <input type="number" id="manual-duration" class="manual-duration" placeholder="min" min="1">
       </div>
-      <input type="text" id="manual-note" maxlength="80" class="text-input"
-             placeholder="Note (optional)" />
+      <input type="text" id="manual-note" class="manual-note" placeholder="Note (optional)">
       <div class="manual-entry-actions">
-        <button id="manual-save-btn"   class="btn-accent" data-i18n="btn_save">Save</button>
-        <button id="manual-cancel-btn" class="btn-ghost">&#10005;</button>
+        <button id="manual-save-btn" class="btn-accent" data-i18n="btn_save">Save</button>
+        <button id="manual-cancel-btn" class="btn-ghost">Cancel</button>
       </div>
     </div>
-
+    
     <ul id="log-list"></ul>
-
+    
     <div class="log-actions log-actions--center">
-      <center><button id="btn-clear-log" data-i18n="btn_clear">Clear Log</button></center>
+      <button id="btn-clear-log" data-i18n="btn_clear">Clear Log</button>
     </div>
-  </div>
+  </main>
 
-  <!-- Settings view -->
-  <div id="view-settings" class="view">
+  <main id="view-settings" class="view">
     <h2 data-i18n="nav_settings">Settings</h2>
-
+    
     <div class="field-group">
       <label class="field-label" data-i18n="settings_duration">Default duration (min)</label>
-      <input type="number" id="settings-duration" min="1" max="480" style="font-size:16px;" />
+      <input type="number" id="settings-duration" min="1" max="480" value="20">
     </div>
-
+    
     <div class="field-group">
       <label class="field-label" data-i18n="settings_sound">Sound</label>
       <div class="sound-row">
         <select id="settings-sound">
-          <option value="bell"      data-i18n="sound_bell">Bell</option>
-          <option value="bell-high" data-i18n="sound_bell_high">Bell (Higher pitch)</option>
-          <option value="chugpi"    data-i18n="sound_chugpi">Jugbi 죽비</option>
-          <option value="none"      data-i18n="sound_silent">Silent</option>
+          <option value="bell" data-i18n="sound_bell">Temple Bell</option>
+          <option value="bell-high" data-i18n="sound_bell_high">High Bell</option>
+          <option value="chugpi" data-i18n="sound_chugpi">Chugpi</option>
+          <option value="none" data-i18n="sound_none">None</option>
         </select>
-        <button id="btn-test-sound" type="button">▶</button>
+        <button id="btn-test-sound" aria-label="Test sound">🔊</button>
       </div>
     </div>
-
+    
     <div class="field-group">
-      <label class="field-label" data-i18n="label_interval">Interval sound every</label>
+      <label class="field-label" data-i18n="settings_interval">Interval bell (min)</label>
       <select id="interval-select">
-        <option value="0"  data-i18n="interval_none">None</option>
-        <option value="5">5 min</option>
-        <option value="10">10 min</option>
-        <option value="15">15 min</option>
-        <option value="20">20 min</option>
+        <option value="0" data-i18n="interval_none">None</option>
+        <option value="5">5</option>
+        <option value="10">10</option>
+        <option value="15">15</option>
+        <option value="20">20</option>
+        <option value="30">30</option>
       </select>
     </div>
-
+    
     <div class="field-group">
       <label class="field-label" data-i18n="settings_prepare">Prepare countdown (sec)</label>
-      <input type="number" id="settings-prepare" min="0" max="60" style="font-size:16px;" />
+      <input type="number" id="settings-prepare" min="0" max="60" value="10">
     </div>
-
+    
     <div class="field-group">
       <label class="field-label" data-i18n="settings_notes">Session notes</label>
       <select id="settings-notes">
-        <option value="on"  data-i18n="notes_on">Enabled</option>
+        <option value="on" data-i18n="notes_on">Enabled</option>
         <option value="off" data-i18n="notes_off">Disabled</option>
       </select>
     </div>
+  </main>
 
+  <div id="ios-install-banner" style="display:none;">
+    <span id="ios-install-text"></span>
+    <button id="ios-install-close" aria-label="Dismiss">×</button>
   </div>
 
-  <!-- iOS install banner -->
-  <div id="ios-install-banner" style="display:none">
-    <span id="ios-install-text">To install: tap
-      <svg width="16" height="16" viewBox="0 0 50 50" fill="currentColor"
-           style="vertical-align:middle;margin:0 2px">
-        <path d="M30.3 8.5 25 3.2l-5.3 5.3 1.4 1.4 3-3V32h2V6.9l3 3z"/>
-        <path d="M9 16v28h32V16H28v2h11v24H11V18h11v-2z"/>
-      </svg>
-      then "Add to Home Screen"
-    </span>
-    <button id="ios-install-close">&#10005;</button>
+  <div id="ios-loading-screen" style="display:none;">
+    <div class="ios-loading-content">
+      <img src="icon-192.png" alt="Silent Bell" class="ios-loading-icon">
+      <div class="ios-loading-spinner"></div>
+      <div class="ios-loading-text">SILENT BELL</div>
+    </div>
   </div>
-
-  <script src="NoSleep.min.js"></script>
-  <script type="module" src="app.js"></script>
 
   <footer class="footer">
     <div class="container">
@@ -243,5 +189,6 @@
     </div>
   </footer>
 
+  <script type="module" src="app.js"></script>
 </body>
 </html>

@@ -3,13 +3,12 @@
 import { t, initI18n } from './modules/i18n.js';
 import { unlockAudio } from './modules/audio-context.js';
 import { 
-  playSound, 
-  playStrokes, 
+  playSingleSound, 
   preloadSoundSet, 
   stopAllAudio,
-  getAudioMode
+  isAudioLoading
 } from './modules/audio.js';
-import { stopSilentLoop } from './modules/silent-loop.js';
+import { startSilentLoop, stopSilentLoop } from './modules/silent-loop.js';
 import {
   formatTime, getTotalSeconds, setTime, changeTime, isTimerRunning,
   startCountdown, startSession, stopSession,
@@ -25,8 +24,6 @@ import { state, loadFromStorage, saveToStorage } from './modules/state.js';
 import { createDragHandler } from './modules/debounced-drag.js';
 import { setupVisibilityHandler, getWakeLockInfo } from './modules/wakelock.js';
 
-// ─── DOM References ──────────────────────────────────────────────
-
 const display = document.getElementById('display');
 const statusEl = document.getElementById('status');
 const btnStart = document.getElementById('btn-start');
@@ -34,65 +31,39 @@ const btnStop = document.getElementById('btn-stop');
 const intervalSelect = document.getElementById('interval-select');
 const displayWrap = document.getElementById('display-wrap');
 
-// Platform detection
 const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent) && !window.MSStream;
 const isAndroid = /Android/.test(navigator.userAgent);
 const isStandalone = window.navigator.standalone === true || window.matchMedia('(display-mode: standalone)').matches;
 
-// Debug logging
 const DEBUG = true;
 function log(...args) {
   if (DEBUG) console.log('[App]', ...args);
 }
 
-// ─── iOS Loading Screen ──────────────────────────────────────────
-
 function showIOSLoadingScreen() {
   const loadingScreen = document.getElementById('ios-loading-screen');
   if (loadingScreen && isIOS && isStandalone) {
     loadingScreen.style.display = 'flex';
-    log('Showing iOS loading screen');
-    
     setTimeout(() => {
-      hideIOSLoadingScreen();
+      loadingScreen.classList.add('hidden');
+      setTimeout(() => {
+        loadingScreen.style.display = 'none';
+      }, 500);
     }, 1500);
   }
 }
-
-function hideIOSLoadingScreen() {
-  const loadingScreen = document.getElementById('ios-loading-screen');
-  if (loadingScreen) {
-    loadingScreen.classList.add('hidden');
-    setTimeout(() => {
-      loadingScreen.style.display = 'none';
-    }, 500);
-  }
-}
-
-// ─── Service Worker Registration ─────────────────────────────────
 
 if ('serviceWorker' in navigator) {
   window.addEventListener('load', () => {
     navigator.serviceWorker.register('sw.js')
       .then(registration => {
         log('SW registered:', registration.scope);
-        
-        registration.addEventListener('updatefound', () => {
-          const newWorker = registration.installing;
-          newWorker.addEventListener('statechange', () => {
-            if (newWorker.state === 'installed' && navigator.serviceWorker.controller) {
-              log('New version available');
-            }
-          });
-        });
       })
       .catch(error => {
         log('SW registration failed:', error);
       });
   });
 }
-
-// ─── Navigation ──────────────────────────────────────────────────
 
 document.querySelectorAll('.nav-btn').forEach(btn => {
   btn.addEventListener('click', () => {
@@ -103,8 +74,6 @@ document.querySelectorAll('.nav-btn').forEach(btn => {
     if (btn.dataset.view === 'log') renderLog();
   });
 });
-
-// ─── Interactive Timer Display with Debounced Drag ───────────────
 
 let dragHandler = null;
 
@@ -134,7 +103,6 @@ function initDragHandler() {
   });
 }
 
-// Arrow button handlers
 document.getElementById('display-up')?.addEventListener('click', (e) => {
   if (!changeTime(0)) return;
   const delta = e.shiftKey ? 1 : 60;
@@ -149,42 +117,65 @@ document.getElementById('display-down')?.addEventListener('click', (e) => {
   saveToStorage();
 });
 
-// ─── Start / Stop Buttons ────────────────────────────────────────
+const originalStartText = btnStart?.textContent || 'Start';
+let isStarting = false;
+
+function setStartButtonLoading(loading) {
+  if (!btnStart) return;
+  
+  if (loading) {
+    isStarting = true;
+    btnStart.disabled = true;
+    btnStart.textContent = t('status_loading') || 'Loading...';
+    btnStart.classList.add('loading');
+  } else {
+    isStarting = false;
+    btnStart.disabled = false;
+    btnStart.textContent = originalStartText;
+    btnStart.classList.remove('loading');
+  }
+}
 
 btnStart?.addEventListener('click', async () => {
+  if (isStarting || btnStart.disabled) {
+    log('Start already in progress, ignoring');
+    return;
+  }
+  
   try {
     log('Start button clicked');
+    setStartButtonLoading(true);
+    statusEl.textContent = t('status_preparing') || 'Preparing audio...';
     
-    // Unlock audio context first (critical for iOS)
+    const currentSound = document.getElementById('settings-sound')?.value || 'bell';
+    
+    log('Unlocking audio...');
     await unlockAudio();
     log('Audio unlocked');
     
-    // Preload the selected sound set
-    const currentSound = document.getElementById('settings-sound')?.value || 'bell';
+    startSilentLoop();
+    
+    log('Preloading sounds...');
     await preloadSoundSet(currentSound);
-    log('Sound set preloaded:', currentSound);
+    log('Sounds preloaded');
     
-    btnStart.disabled = true;
-    statusEl.textContent = t('status_ready');
-    
-    // Initialize wake lock
     initNoSleep();
     enableNoSleep();
     
-    // Get timer state for logging
     const timerState = getTimerState();
     setSessionStart(Date.now());
     setPlannedDuration(getTotalSeconds());
     setCurrentSoundForLog(timerState.currentSound);
     
-    // Start countdown
+    setStartButtonLoading(false);
+    
     startCountdown(display, statusEl, btnStart, btnStop, () => {
       startSession(display, statusEl, btnStart, btnStop, intervalSelect?.value);
     });
   } catch (error) {
     log('Start session failed:', error);
-    statusEl.textContent = t('status_error') || 'Error starting session';
-    btnStart.disabled = false;
+    setStartButtonLoading(false);
+    statusEl.textContent = t('status_error') || 'Error - tap to retry';
   }
 });
 
@@ -198,19 +189,13 @@ btnStop?.addEventListener('click', () => {
     }
   } catch (error) {
     log('Error stopping session:', error);
-    // Ensure UI is reset even on error
-    try {
-      btnStart.disabled = false;
-      btnStop.disabled = true;
-      statusEl.textContent = t('status_ready');
-      display.textContent = formatTime(getTotalSeconds());
-    } catch (e) {
-      log('Error resetting UI:', e);
-    }
+    btnStart.disabled = false;
+    btnStart.textContent = originalStartText;
+    btnStop.disabled = true;
+    statusEl.textContent = t('status_ready');
+    display.textContent = formatTime(getTotalSeconds());
   }
 });
-
-// ─── CSV Export / Import ─────────────────────────────────────────
 
 document.getElementById('btn-export')?.addEventListener('click', exportCSV);
 
@@ -233,8 +218,6 @@ document.getElementById('import-csv-file')?.addEventListener('change', (e) => {
   
   e.target.value = '';
 });
-
-// ─── Manual Session Entry ────────────────────────────────────────
 
 document.getElementById('btn-manual-log')?.addEventListener('click', () => {
   const form = document.getElementById('manual-entry');
@@ -305,8 +288,6 @@ document.getElementById('manual-save-btn')?.addEventListener('click', () => {
   alert(t('manual_saved'));
 });
 
-// ─── Clear Log ────────────────────────────────────────────────────
-
 document.getElementById('btn-clear-log')?.addEventListener('click', () => {
   if (confirm(t('confirm_clear'))) {
     clearLog();
@@ -314,26 +295,67 @@ document.getElementById('btn-clear-log')?.addEventListener('click', () => {
   }
 });
 
-// ─── Test Sound ───────────────────────────────────────────────────
+let testAudioPlaying = false;
+let currentTestAudio = null;
 
 document.getElementById('btn-test-sound')?.addEventListener('click', async () => {
   log('Test sound clicked');
+  
   try {
-    await unlockAudio();
-    const type = document.getElementById('settings-sound')?.value;
-    log('Playing test sound:', type, 'Mode:', getAudioMode());
+    if (testAudioPlaying && currentTestAudio) {
+      log('Stopping test sound');
+      try {
+        currentTestAudio.pause();
+        currentTestAudio.currentTime = 0;
+      } catch (e) {}
+      testAudioPlaying = false;
+      currentTestAudio = null;
+      stopSilentLoop();
+      return;
+    }
     
-    if (type === 'chugpi') {
-      playStrokes('chugpi', 1);
-    } else if (type && type !== 'none') {
-      playSound(type);
+    await unlockAudio();
+    startSilentLoop();
+    
+    const type = document.getElementById('settings-sound')?.value;
+    log('Playing test sound:', type);
+    
+    if (type && type !== 'none') {
+      const files = {
+        'bell': 'sounds/temple_bell_standard.mp3',
+        'bell-high': 'sounds/temple_bell_high.mp3',
+        'chugpi': 'sounds/chugpi.mp3'
+      };
+      
+      const src = files[type];
+      if (src) {
+        currentTestAudio = new Audio(src);
+        currentTestAudio.volume = 1.0;
+        currentTestAudio.loop = false;
+        
+        currentTestAudio.addEventListener('ended', () => {
+          testAudioPlaying = false;
+          currentTestAudio = null;
+          stopSilentLoop();
+        });
+        
+        currentTestAudio.addEventListener('error', () => {
+          testAudioPlaying = false;
+          currentTestAudio = null;
+          stopSilentLoop();
+        });
+        
+        await currentTestAudio.play();
+        testAudioPlaying = true;
+      }
     }
   } catch (error) {
     log('Test sound failed:', error);
+    testAudioPlaying = false;
+    currentTestAudio = null;
+    stopSilentLoop();
   }
 });
-
-// ─── iOS Install Banner ───────────────────────────────────────────
 
 (function initIOSBanner() {
   const isIos = /iphone|ipad|ipod/i.test(navigator.userAgent);
@@ -357,8 +379,6 @@ document.getElementById('btn-test-sound')?.addEventListener('click', async () =>
   });
 })();
 
-// ─── Keyboard Shortcuts ──────────────────────────────────────────
-
 document.addEventListener('keydown', (e) => {
   if (e.code === 'Space' && !e.target.matches('input, textarea')) {
     e.preventDefault();
@@ -375,58 +395,19 @@ document.addEventListener('keydown', (e) => {
   }
 });
 
-// ─── iOS-Specific Setup ──────────────────────────────────────────
-
 if (isIOS) {
   log('iOS detected, setting up handlers');
-  
-  if (isStandalone) {
-    showIOSLoadingScreen();
-  }
-  
+  showIOSLoadingScreen();
   setupVisibilityHandler();
-  
-  window.addEventListener('pagehide', () => {
-    log('Page hide - maintaining audio session');
-  });
-  
-  window.addEventListener('pageshow', () => {
-    log('Page show - checking audio session');
-    unlockAudio().catch(() => {});
-  });
-  
-  document.addEventListener('visibilitychange', () => {
-    if (document.visibilityState === 'visible') {
-      log('Page visible - ensuring audio context');
-      unlockAudio().catch(() => {});
-    }
-  });
 }
-
-// ─── Android-Specific Setup ──────────────────────────────────────
-
-if (isAndroid) {
-  log('Android detected, setting up handlers');
-  
-  document.addEventListener('visibilitychange', () => {
-    if (document.visibilityState === 'visible') {
-      log('Android page visible - resuming audio if needed');
-      unlockAudio().catch(() => {});
-    }
-  });
-}
-
-// ─── Global Error Handling ───────────────────────────────────────
 
 window.addEventListener('error', (e) => {
-  log('Global error:', e.message, e.filename, e.lineno);
+  log('Global error:', e.message);
 });
 
 window.addEventListener('unhandledrejection', (e) => {
   log('Unhandled promise rejection:', e.reason);
 });
-
-// ─── Debug Helpers ───────────────────────────────────────────────
 
 if (typeof window !== 'undefined') {
   window.SilentBell = {
@@ -434,18 +415,15 @@ if (typeof window !== 'undefined') {
     isTimerRunning,
     saveToStorage,
     loadFromStorage,
-    getAudioMode,
-    preloadSoundSet
+    preloadSoundSet,
+    unlockAudio
   };
 }
 
-// ─── Initialization ──────────────────────────────────────────────
-
 function init() {
-  log('Initializing Silent Bell...');
+  log('Initializing Silent Bell v1.3.1...');
   log('Platform:', isIOS ? 'iOS' : isAndroid ? 'Android' : 'Desktop');
   log('Standalone:', isStandalone);
-  log('Audio mode:', getAudioMode());
   
   initI18n();
   loadFromStorage();
@@ -455,7 +433,6 @@ function init() {
   initDragHandler();
   saveToStorage();
   
-  // Preload default sound set
   const defaultSound = 'bell';
   preloadSoundSet(defaultSound).catch(() => {});
   

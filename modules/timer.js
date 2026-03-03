@@ -26,7 +26,6 @@ let wakeLockAcquired = false;
 let audioKeepaliveStarted = false;
 
 const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent) && !window.MSStream;
-const isAndroid = /Android/.test(navigator.userAgent);
 
 const DEBUG = true;
 function log(...args) {
@@ -116,7 +115,6 @@ export function startCountdown(displayEl, statusEl, btnStart, btnStop, onComplet
   const prepareSeconds = get('timer.prepareSeconds') || 10;
   let secsLeft = prepareSeconds;
   
-  // Reset state flags
   wakeLockAcquired = false;
   audioKeepaliveStarted = false;
   
@@ -170,15 +168,12 @@ export async function startSession(displayEl, statusEl, btnStart, btnStop, inter
   
   log('Starting session, duration:', plannedDuration, 'seconds');
   
-  // Ensure silent loop is running (keeps audio session alive)
   startSilentLoop();
   
   const currentSound = get('audio.currentSound') || 'bell';
   
-  // Preload sounds
   await preloadSoundSet(currentSound);
   
-  // Acquire wake lock
   try {
     const method = await acquireWakeLock();
     wakeLockAcquired = true;
@@ -188,7 +183,6 @@ export async function startSession(displayEl, statusEl, btnStart, btnStop, inter
     wakeLockAcquired = false;
   }
   
-  // Start audio keepalive for iOS
   if (isIOS) {
     try {
       const ctx = getAudioContext();
@@ -201,7 +195,6 @@ export async function startSession(displayEl, statusEl, btnStart, btnStop, inter
     }
   }
   
-  // Play start sound
   try {
     await playStartSound(currentSound);
   } catch (error) {
@@ -216,7 +209,7 @@ export async function startSession(displayEl, statusEl, btnStart, btnStop, inter
   
   timerInterval = setInterval(() => {
     tick(displayEl, statusEl, btnStart, btnStop);
-  }, 500);
+  }, 1000);
 }
 
 function tick(displayEl, statusEl, btnStart, btnStop) {
@@ -255,10 +248,7 @@ async function completeSession(displayEl, statusEl, btnStart, btnStop) {
   
   const currentSound = get('audio.currentSound') || 'bell';
   
-  // Keep silent loop running for end bell on locked screen
-  
   try {
-    // Ensure audio context is active before playing end sound
     if (isIOS) {
       const ctx = getAudioContext();
       if (ctx.state === 'suspended') {
@@ -271,7 +261,6 @@ async function completeSession(displayEl, statusEl, btnStart, btnStop) {
     await playEndSound(currentSound);
     log('End sound played');
     
-    // Stop silent loop after end bell (with delay for long end sequences)
     setTimeout(() => {
       stopSilentLoop();
       stopAllAudio();
@@ -282,7 +271,6 @@ async function completeSession(displayEl, statusEl, btnStart, btnStop) {
     stopAllAudio();
   }
   
-  // Release wake lock
   if (wakeLockAcquired) {
     try {
       await releaseWakeLock();
@@ -317,7 +305,6 @@ async function completeSession(displayEl, statusEl, btnStart, btnStop) {
 export function stopSession(displayEl, statusEl, btnStart, btnStop) {
   log('Stopping session...');
   
-  // Handle countdown stop (preparation phase)
   if (countdownInterval) {
     log('Stopping during countdown phase');
     
@@ -328,7 +315,6 @@ export function stopSession(displayEl, statusEl, btnStart, btnStop) {
     }
     countdownInterval = null;
     
-    // Only release resources if they were acquired
     if (wakeLockAcquired) {
       try {
         releaseWakeLock().catch(() => {});
@@ -367,13 +353,11 @@ export function stopSession(displayEl, statusEl, btnStart, btnStop) {
     return { stopped: true, early: false };
   }
   
-  // Not running
   if (!timerInterval) {
     log('No active timer to stop');
     return { stopped: false };
   }
   
-  // Stop main timer
   clearInterval(timerInterval);
   timerInterval = null;
   

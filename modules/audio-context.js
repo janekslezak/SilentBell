@@ -33,13 +33,11 @@ export async function unlockAudio() {
     
     // iOS: Play a short silent sound to unlock
     if (isIOS) {
-      // Create a short silent buffer
       const buffer = ctx.createBuffer(1, 512, ctx.sampleRate);
       const source = ctx.createBufferSource();
       source.buffer = buffer;
       source.connect(ctx.destination);
       source.start(0);
-      
       log('Played silent unlock sound');
     }
     

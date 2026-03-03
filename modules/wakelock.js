@@ -10,7 +10,6 @@ let isActive = false;
 let currentMethod = null;
 
 const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent) && !window.MSStream;
-const isAndroid = /Android/.test(navigator.userAgent);
 const isStandalone = window.navigator.standalone === true || window.matchMedia('(display-mode: standalone)').matches;
 
 const DEBUG = true;
@@ -101,7 +100,6 @@ export async function acquireWakeLock() {
   }
   
   isActive = true;
-  
   startSilentLoop();
   
   const methods = [
@@ -258,50 +256,11 @@ export function setupVisibilityHandler(audioContext) {
   });
 }
 
-export function isIOSStandalone() {
-  return isIOS && isStandalone;
-}
-
-export function setupIOSStandaloneHandler() {
-  if (!isIOSStandalone()) return;
-  
-  log('iOS standalone mode detected');
-  
-  window.addEventListener('pagehide', () => {
-    log('Page hide event - maintaining audio session');
-    if (isActive) {
-      startSilentLoop();
-    }
-  });
-  
-  window.addEventListener('pageshow', () => {
-    log('Page show event - checking audio session');
-  });
-  
-  window.addEventListener('beforeunload', () => {
-    cleanupWakeLock();
-  });
-}
-
-export function cleanupWakeLock() {
-  releaseWakeLock();
-  stopAudioKeepalive();
-  
-  if (videoElement) {
-    try {
-      URL.revokeObjectURL(videoElement.src);
-      videoElement.remove();
-    } catch (e) {}
-    videoElement = null;
-  }
-}
-
 export function getWakeLockInfo() {
   return {
     isActive,
     currentMethod,
     isIOS,
-    isAndroid,
     isStandalone,
     nativeWakeLock: nativeWakeLock ? { released: nativeWakeLock.released } : null,
     noSleepInstance: noSleepInstance ? { enabled: noSleepInstance.enabled } : null,

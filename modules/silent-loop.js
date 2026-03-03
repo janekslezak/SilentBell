@@ -29,31 +29,22 @@ export function startSilentLoop() {
       return;
     }
     
-    // Create new audio context for silent loop
     audioContext = new AudioCtx();
-    
     oscillator = audioContext.createOscillator();
     gainNode = audioContext.createGain();
     
-    // Very low frequency, very quiet - essentially silent but keeps session alive
-    oscillator.frequency.value = 1; // 1Hz - below human hearing
-    gainNode.gain.value = 0.001; // Very quiet
+    oscillator.frequency.value = 1;
+    gainNode.gain.value = 0.0001;
     
     oscillator.connect(gainNode);
     gainNode.connect(audioContext.destination);
-    
     oscillator.start();
     
-    // Resume context if suspended
     if (audioContext.state === 'suspended') {
-      audioContext.resume().then(() => {
-        log('Silent loop context resumed');
-      }).catch((e) => {
-        log('Failed to resume silent loop context:', e.message);
-      });
+      audioContext.resume().catch(() => {});
     }
     
-    log('Silent loop started, state:', audioContext.state);
+    log('Silent loop started');
   } catch (e) {
     log('Failed to start silent loop:', e.message);
     isRunning = false;
@@ -61,27 +52,25 @@ export function startSilentLoop() {
 }
 
 export function stopSilentLoop() {
-  if (!isRunning) {
-    return;
-  }
+  if (!isRunning) return;
   
   isRunning = false;
   log('Stopping silent loop...');
   
   try {
     if (oscillator) {
-      oscillator.stop();
-      oscillator.disconnect();
+      try { oscillator.stop(); } catch (e) {}
+      try { oscillator.disconnect(); } catch (e) {}
       oscillator = null;
     }
     
     if (gainNode) {
-      gainNode.disconnect();
+      try { gainNode.disconnect(); } catch (e) {}
       gainNode = null;
     }
     
     if (audioContext) {
-      audioContext.close().catch(() => {});
+      try { audioContext.close(); } catch (e) {}
       audioContext = null;
     }
     
@@ -93,18 +82,4 @@ export function stopSilentLoop() {
 
 export function isSilentLoopRunning() {
   return isRunning;
-}
-
-// Handle visibility changes to keep audio alive
-if (isIOS) {
-  document.addEventListener('visibilitychange', () => {
-    if (document.visibilityState === 'hidden' && isRunning) {
-      log('Page hidden - silent loop maintaining audio session');
-    } else if (document.visibilityState === 'visible' && isRunning && audioContext) {
-      log('Page visible - checking silent loop');
-      if (audioContext.state === 'suspended') {
-        audioContext.resume().catch(() => {});
-      }
-    }
-  });
 }
