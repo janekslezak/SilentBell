@@ -342,22 +342,3 @@ export function stopSession(displayEl, statusEl, btnStart, btnStop) {
   
   return { stopped: true, early: true, actual };
 }
-
-let noSleep = null;
-
-export function initNoSleep() {
-  if (!noSleep && window.NoSleep) noSleep = new NoSleep();
-  return noSleep;
-}
-
-export function enableNoSleep() {
-  if (noSleep) {
-    noSleep.enable().catch(() => {});
-  }
-}
-
-export function disableNoSleep() {
-  if (noSleep) {
-    noSleep.disable();
-  }
-}

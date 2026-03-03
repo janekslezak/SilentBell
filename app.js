@@ -14,7 +14,6 @@ import { startSilentLoop, stopSilentLoop } from './modules/silent-loop.js';
 import {
   formatTime, getTotalSeconds, setTime, changeTime, isTimerRunning,
   startCountdown, startSession, stopSession,
-  initNoSleep, enableNoSleep, disableNoSleep,
   getTimerState
 } from './modules/timer.js';
 import {
@@ -164,8 +163,6 @@ async function processStart(currentSound) {
     statusEl.textContent = t('status_preparing') || 'Preparing...';
     
     startSilentLoop();
-    initNoSleep();
-    enableNoSleep();
     
     const timerState = getTimerState();
     setSessionStart(Date.now());
@@ -201,8 +198,6 @@ async function handleStandardStart() {
     
     await unlockAudio();
     startSilentLoop();
-    initNoSleep();
-    enableNoSleep();
     
     const timerState = getTimerState();
     setSessionStart(Date.now());
@@ -234,11 +229,7 @@ if (btnStart) {
 btnStop?.addEventListener('click', () => {
   try {
     log('Stop button clicked');
-    const result = stopSession(display, statusEl, btnStart, btnStop);
-    
-    if (result.stopped && !result.early) {
-      disableNoSleep();
-    }
+    stopSession(display, statusEl, btnStart, btnStop);
   } catch (error) {
     log('Error stopping session:', error);
     btnStart.disabled = false;
