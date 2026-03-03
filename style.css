@@ -4,7 +4,7 @@
 [data-theme="dark"] {
   --bg: #111820;
   --surface: #1a2232;
-  --accent: #88c0d0;
+  --accent: #c4a77d;  /* Warm Sand - complements bronze bell */
   --text: #eceff4;
   --muted: #7b8fa1;
   --danger: #bf616a;
@@ -15,7 +15,7 @@
 [data-theme="light"] {
   --bg: #f0ece4;
   --surface: #ffffff;
-  --accent: #4a7c8e;
+  --accent: #8b7355;  /* Warm Sand for light mode */
   --text: #2e3440;
   --muted: #7b8fa1;
   --danger: #bf616a;
@@ -35,7 +35,6 @@ html {
 
 body {
   font-family: system-ui, -apple-system, sans-serif;
-  background: var(--bg);
   color: var(--text);
   min-height: 100vh;
   display: flex;
@@ -45,7 +44,36 @@ body {
   padding-bottom: 32px;
   position: relative;
   transition: background 0.3s, color 0.3s;
+  
+  /* Gentle organic background */
+  background-color: var(--bg);
+  background-image: 
+    radial-gradient(ellipse at 50% 30%, rgba(196, 167, 125, 0.06) 0%, transparent 50%),
+    url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noiseFilter'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noiseFilter)' opacity='0.03'/%3E%3C/svg%3E");
+  background-attachment: fixed;
 }
+
+[data-theme="light"] body {
+  background-image: 
+    radial-gradient(ellipse at 50% 30%, rgba(139, 115, 85, 0.05) 0%, transparent 50%),
+    url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noiseFilter'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noiseFilter)' opacity='0.025'/%3E%3C/svg%3E");
+}
+
+/* ─── Meditation Mode - Hide Nav & Footer ──────────────────────── */
+
+body.meditating nav,
+body.meditating footer {
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.4s ease;
+  height: 0;
+  overflow: hidden;
+  padding: 0;
+  border: none;
+  margin: 0;
+}
+
+/* ─── Header ───────────────────────────────────────────────────── */
 
 header {
   display: flex;
@@ -58,6 +86,12 @@ header {
   z-index: 20;
   border-bottom: 1px solid var(--border);
   transition: background 0.3s;
+  /* Subtle warmth to complement the bronze bell icon */
+  background: linear-gradient(to bottom, var(--bg), rgba(196, 167, 125, 0.03));
+}
+
+[data-theme="dark"] header {
+  background: linear-gradient(to bottom, #111820, rgba(196, 167, 125, 0.04));
 }
 
 .header-left {
@@ -71,14 +105,21 @@ header {
   height: 32px;
   border-radius: 6px;
   object-fit: cover;
+  /* Warm bronze tint to match the bell aesthetic */
+  filter: sepia(20%) saturate(120%) hue-rotate(10deg);
+  opacity: 0.9;
+  transition: filter 0.3s, opacity 0.3s;
 }
 
 .header-title {
-  font-size: 1.05rem;
+  font-size: 1.15rem;
   font-weight: 400;
-  color: var(--text);
-  letter-spacing: 1px;
-  transition: color 0.3s;
+  letter-spacing: 0.5px;
+  /* Slightly warmer tone using accent */
+  color: var(--accent);
+  opacity: 0.95;
+  /* Elegant serif feel */
+  font-family: Georgia, 'Times New Roman', serif;
 }
 
 .header-controls {
@@ -91,18 +132,22 @@ header {
   background: var(--surface);
   border: 1px solid var(--border);
   border-radius: 8px;
-  color: var(--text);
+  color: var(--muted);
   font-size: 0.85rem;
   cursor: pointer;
   touch-action: manipulation;
   -webkit-tap-highlight-color: transparent;
-  transition: background 0.2s, color 0.2s;
+  transition: all 0.2s ease;
+  font-family: inherit;
 }
 
 .btn-lang:hover, #btn-theme:hover {
   border-color: var(--accent);
   color: var(--accent);
+  background: rgba(196, 167, 125, 0.05);
 }
+
+/* ─── Navigation ───────────────────────────────────────────────── */
 
 nav {
   display: flex;
@@ -111,6 +156,7 @@ nav {
   position: sticky;
   top: 57px;
   z-index: 10;
+  transition: opacity 0.4s ease, height 0.4s ease, padding 0.4s ease;
   transition: background 0.3s;
 }
 
@@ -137,6 +183,8 @@ nav {
   border-bottom: 2px solid var(--accent);
 }
 
+/* ─── Views ────────────────────────────────────────────────────── */
+
 .view {
   display: none;
   padding: 24px 20px;
@@ -149,6 +197,8 @@ nav {
 .view.active {
   display: flex;
 }
+
+/* ─── Timer Display ────────────────────────────────────────────── */
 
 #display-wrap {
   display: flex;
@@ -281,6 +331,8 @@ nav {
   pointer-events: none;
 }
 
+/* ─── Notes ────────────────────────────────────────────────────── */
+
 .note-wrap {
   display: none;
   flex-direction: column;
@@ -323,6 +375,8 @@ nav {
   color: var(--bg);
 }
 
+/* ─── Lotus Figure (Original Animation) ────────────────────────── */
+
 .lotus-figure {
   display: none;
   justify-content: center;
@@ -336,7 +390,20 @@ nav {
   color: var(--accent);
   opacity: 0.75;
   transition: color 0.3s, opacity 0.3s;
+  /* No glow effects */
+  filter: none;
 }
+
+#view-timer.meditating .lotus-svg {
+  animation: lotus-pulse 4s ease-in-out infinite;
+}
+
+@keyframes lotus-pulse {
+  0%, 100% { opacity: 0.75; transform: scale(1); }
+  50%       { opacity: 0.35; transform: scale(0.96); }
+}
+
+/* ─── Log View ─────────────────────────────────────────────────── */
 
 #view-log h2 {
   text-align: center;
@@ -583,6 +650,8 @@ nav {
   background: rgba(191, 97, 106, 0.1);
 }
 
+/* ─── Settings ─────────────────────────────────────────────────── */
+
 #view-settings h2 {
   text-align: center;
   margin-bottom: 24px;
@@ -657,6 +726,8 @@ nav {
   background: var(--bg);
 }
 
+/* ─── iOS Install Banner ───────────────────────────────────────── */
+
 #ios-install-banner {
   position: fixed;
   bottom: 20px;
@@ -692,6 +763,8 @@ nav {
   padding: 4px 6px;
   flex-shrink: 0;
 }
+
+/* ─── iOS Loading Screen ───────────────────────────────────────── */
 
 #ios-loading-screen {
   position: fixed;
@@ -746,7 +819,13 @@ nav {
   color: var(--accent);
   letter-spacing: 2px;
   font-weight: 300;
+  /* Title case, no all-caps */
+  text-transform: none;
+  font-family: Georgia, 'Times New Roman', serif;
+  opacity: 0.9;
 }
+
+/* ─── Meditation State Layout ──────────────────────────────────── */
 
 #view-timer.meditating {
   align-items: center;
@@ -765,15 +844,6 @@ nav {
 
 #view-timer.meditating #display-arrows { display: none; }
 
-#view-timer.meditating .lotus-svg {
-  animation: lotus-pulse 4s ease-in-out infinite;
-}
-
-@keyframes lotus-pulse {
-  0%, 100% { opacity: 0.75; transform: scale(1); }
-  50%       { opacity: 0.35; transform: scale(0.96); }
-}
-
 #view-timer.meditating .controls {
   flex-direction: column;
   align-items: center;
@@ -788,11 +858,14 @@ nav {
   padding: 16px 0;
 }
 
+/* ─── Footer ───────────────────────────────────────────────────── */
+
 .footer {
   margin-top: auto;
   padding: 20px;
   text-align: center;
   border-top: 1px solid var(--border);
+  transition: opacity 0.4s ease, height 0.4s ease, padding 0.4s ease;
 }
 
 .footer .container {
@@ -815,6 +888,8 @@ nav {
   color: var(--accent);
 }
 
+/* ─── Safe Area Support ────────────────────────────────────────── */
+
 @supports (padding-top: env(safe-area-inset-top)) {
   body {
     padding-top: env(safe-area-inset-top);
@@ -833,6 +908,8 @@ nav {
     bottom: calc(20px + env(safe-area-inset-bottom));
   }
 }
+
+/* ─── Responsive ───────────────────────────────────────────────── */
 
 @media (max-width: 375px) {
   #display {
