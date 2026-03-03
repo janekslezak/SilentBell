@@ -5,6 +5,7 @@ import { startSilentLoop, stopSilentLoop } from './silent-loop.js';
 
 let audioCtx = null;
 let isUnlocked = false;
+let unlockPromise = null;
 
 const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent) && !window.MSStream;
 
@@ -63,6 +64,29 @@ export async function ensureAudioContext() {
 }
 
 export async function unlockAudio() {
+  // If already unlocking, return existing promise
+  if (unlockPromise) {
+    log('Audio unlock already in progress, waiting...');
+    return unlockPromise;
+  }
+  
+  // If already unlocked and running, just return
+  if (isUnlocked && audioCtx && audioCtx.state === 'running') {
+    log('Audio already unlocked and running');
+    return audioCtx;
+  }
+  
+  unlockPromise = _doUnlockAudio();
+  
+  try {
+    const result = await unlockPromise;
+    return result;
+  } finally {
+    unlockPromise = null;
+  }
+}
+
+async function _doUnlockAudio() {
   log('Unlocking audio...');
   
   try {
@@ -72,13 +96,45 @@ export async function unlockAudio() {
       ctx = createFreshAudioContext();
     }
     
-    const buffer = ctx.createBuffer(1, 512, ctx.sampleRate);
-    const source = ctx.createBufferSource();
-    source.buffer = buffer;
-    source.connect(ctx.destination);
-    source.start(0);
+    // iOS-specific: Play a short silent sound to unlock
+    if (isIOS) {
+      log('iOS: Playing unlock sound...');
+      
+      // Create a short beep to unlock audio
+      const osc = ctx.createOscillator();
+      const gain = ctx.createGain();
+      
+      osc.frequency.value = 1; // Very low frequency (almost silent)
+      gain.gain.value = 0.001; // Very quiet
+      
+      osc.connect(gain);
+      gain.connect(ctx.destination);
+      
+      const now = ctx.currentTime;
+      osc.start(now);
+      osc.stop(now + 0.001);
+      
+      // Also try with a buffer source for redundancy
+      const buffer = ctx.createBuffer(1, 512, ctx.sampleRate);
+      const source = ctx.createBufferSource();
+      source.buffer = buffer;
+      source.connect(ctx.destination);
+      source.start(0);
+    } else {
+      // Non-iOS: simpler approach
+      const buffer = ctx.createBuffer(1, 512, ctx.sampleRate);
+      const source = ctx.createBufferSource();
+      source.buffer = buffer;
+      source.connect(ctx.destination);
+      source.start(0);
+    }
     
     await ctx.resume();
+    
+    // Wait a moment for iOS to process
+    if (isIOS) {
+      await new Promise(r => setTimeout(r, 50));
+    }
     
     startSilentLoop();
     
@@ -89,6 +145,7 @@ export async function unlockAudio() {
   } catch (e) {
     log('unlockAudio error:', e.message);
     
+    // Fallback: try creating a fresh context
     try {
       const ctx = createFreshAudioContext();
       await ctx.resume();
@@ -123,21 +180,28 @@ export function getAudioContextState() {
   return {
     state: audioCtx?.state || 'none',
     isUnlocked,
-    isIOS
+    isIOS,
+    isUnlocking: !!unlockPromise
   };
 }
 
+// iOS-specific handlers
 if (isIOS) {
-  log('iOS detected, setting up handlers');
+  log('iOS detected, setting up audio handlers');
   
   window.addEventListener('pagehide', () => {
     log('Page hide - audio context state:', audioCtx?.state);
   });
   
-  window.addEventListener('pageshow', () => {
+  window.addEventListener('pageshow', async () => {
     log('Page show - audio context state:', audioCtx?.state);
     if (audioCtx?.state === 'suspended') {
-      audioCtx.resume().catch(() => {});
+      try {
+        await audioCtx.resume();
+        log('AudioContext resumed on pageshow');
+      } catch (e) {
+        log('Failed to resume on pageshow:', e.message);
+      }
     }
   });
   
@@ -145,12 +209,24 @@ if (isIOS) {
     log('Window blur - maintaining audio session');
   });
   
-  window.addEventListener('focus', () => {
+  window.addEventListener('focus', async () => {
     log('Window focus - checking audio session');
     if (audioCtx?.state === 'suspended') {
-      audioCtx.resume().catch(() => {});
+      try {
+        await audioCtx.resume();
+        log('AudioContext resumed on focus');
+      } catch (e) {
+        log('Failed to resume on focus:', e.message);
+      }
     }
   });
+  
+  // Handle audio session interruptions (phone calls, etc.)
+  if (audioCtx) {
+    audioCtx.onstatechange = () => {
+      log('AudioContext state changed to:', audioCtx?.state);
+    };
+  }
 }
 
 document.addEventListener('visibilitychange', () => {

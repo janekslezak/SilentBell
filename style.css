@@ -269,6 +269,30 @@ nav {
   pointer-events: none;
 }
 
+#btn-start.loading {
+  opacity: 0.8;
+  cursor: wait;
+  position: relative;
+}
+
+#btn-start.loading::after {
+  content: '';
+  position: absolute;
+  width: 16px;
+  height: 16px;
+  margin-left: 8px;
+  border: 2px solid var(--bg);
+  border-top-color: transparent;
+  border-radius: 50%;
+  animation: btn-spin 0.8s linear infinite;
+  display: inline-block;
+  vertical-align: middle;
+}
+
+@keyframes btn-spin {
+  to { transform: rotate(360deg); }
+}
+
 /* Note Wrap */
 .note-wrap {
   display: none;

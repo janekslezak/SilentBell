@@ -19,6 +19,11 @@ const audioCache = new Map();
 const audioPreloadPromises = new Map();
 let activeAudioElements = [];
 
+// Loading state tracking
+let isLoading = false;
+let loadingProgress = 0;
+const loadingCallbacks = [];
+
 const AUDIO_FILES = {
   'bell': {
     start: 'sounds/sequence_bell_start.mp3',
@@ -69,6 +74,33 @@ export function getAudioMode() {
   return audioMode;
 }
 
+// Loading state management
+export function isAudioLoading() {
+  return isLoading;
+}
+
+export function getLoadingProgress() {
+  return loadingProgress;
+}
+
+export function onLoadingProgress(callback) {
+  loadingCallbacks.push(callback);
+  return () => {
+    const idx = loadingCallbacks.indexOf(callback);
+    if (idx > -1) loadingCallbacks.splice(idx, 1);
+  };
+}
+
+function setLoading(loading) {
+  isLoading = loading;
+  loadingCallbacks.forEach(cb => cb({ loading, progress: loadingProgress }));
+}
+
+function setProgress(progress) {
+  loadingProgress = progress;
+  loadingCallbacks.forEach(cb => cb({ loading: isLoading, progress }));
+}
+
 function getAudioElement(src) {
   if (audioCache.has(src)) {
     return audioCache.get(src);
@@ -89,37 +121,125 @@ export function preloadAudio(src) {
     const audio = getAudioElement(src);
     
     if (audio.readyState >= 3) {
+      log('Audio already loaded:', src);
       resolve(audio);
       return;
     }
     
-    audio.addEventListener('canplaythrough', () => resolve(audio), { once: true });
-    audio.addEventListener('error', (e) => reject(new Error(`Failed to load ${src}`)), { once: true });
-    
-    setTimeout(() => {
+    const timeoutId = setTimeout(() => {
       if (audio.readyState >= 2) {
+        log('Audio load timeout but readyState ok:', src, 'readyState:', audio.readyState);
         resolve(audio);
+      } else {
+        log('Audio load timeout:', src, 'readyState:', audio.readyState);
+        // Don't reject - try to use it anyway on iOS
+        if (isIOS) {
+          resolve(audio);
+        } else {
+          reject(new Error(`Timeout loading ${src}`));
+        }
       }
-    }, 5000);
+    }, 8000);
+    
+    const onCanPlay = () => {
+      clearTimeout(timeoutId);
+      log('Audio can play:', src);
+      resolve(audio);
+    };
+    
+    const onError = (e) => {
+      clearTimeout(timeoutId);
+      log('Audio load error:', src, e);
+      // On iOS, still resolve as the audio might work on user gesture
+      if (isIOS) {
+        resolve(audio);
+      } else {
+        reject(new Error(`Failed to load ${src}`));
+      }
+    };
+    
+    audio.addEventListener('canplaythrough', onCanPlay, { once: true });
+    audio.addEventListener('canplay', onCanPlay, { once: true });
+    audio.addEventListener('error', onError, { once: true });
+    
+    // Force load
+    audio.load();
   });
   
   audioPreloadPromises.set(src, promise);
   return promise;
 }
 
-export async function preloadSoundSet(soundType) {
+export async function preloadSoundSet(soundType, onProgress = null) {
   const files = AUDIO_FILES[soundType];
-  if (!files) return;
+  if (!files) {
+    log('No files found for sound type:', soundType);
+    return;
+  }
+  
+  setLoading(true);
+  setProgress(0);
+  
+  const soundFiles = [files.start, files.interval, files.end];
+  const total = soundFiles.length;
+  let loaded = 0;
   
   try {
+    log('Preloading sound set:', soundType);
+    
+    await Promise.all(soundFiles.map(async (src, index) => {
+      try {
+        await preloadAudio(src);
+        loaded++;
+        const progress = Math.round((loaded / total) * 100);
+        setProgress(progress);
+        if (onProgress) onProgress(progress);
+        log(`Loaded ${loaded}/${total}:`, src);
+      } catch (error) {
+        log('Failed to preload:', src, error.message);
+        // Continue even if one fails
+        loaded++;
+      }
+    }));
+    
+    log(`Preloaded ${soundType} sound set (${loaded}/${total} files)`);
+  } catch (error) {
+    log('Failed to preload sound set:', error.message);
+  } finally {
+    setLoading(false);
+  }
+}
+
+// iOS-specific: Preload with user gesture simulation
+export async function preloadWithUserGesture(soundType) {
+  if (!isIOS) {
+    return preloadSoundSet(soundType);
+  }
+  
+  log('iOS: Preloading with user gesture context');
+  setLoading(true);
+  
+  const files = AUDIO_FILES[soundType] || AUDIO_FILES['bell'];
+  
+  try {
+    // On iOS, we need to create and play a silent sound to unlock audio
+    const ctx = getAudioContext();
+    if (ctx.state === 'suspended') {
+      await ctx.resume();
+    }
+    
+    // Preload all files
     await Promise.all([
       preloadAudio(files.start),
       preloadAudio(files.interval),
       preloadAudio(files.end)
     ]);
-    log(`Preloaded ${soundType} sound set`);
+    
+    log('iOS: Sound set preloaded successfully');
   } catch (error) {
-    log('Failed to preload sound set:', error.message);
+    log('iOS: Preload error (non-fatal):', error.message);
+  } finally {
+    setLoading(false);
   }
 }
 
@@ -145,6 +265,21 @@ async function playHTML5Audio(src, volume = 1.0) {
       const idx = activeAudioElements.indexOf(audio);
       if (idx > -1) activeAudioElements.splice(idx, 1);
     }, { once: true });
+    
+    // iOS: ensure we have user gesture context
+    if (isIOS && audio.readyState < 2) {
+      log('iOS: Audio not fully loaded, waiting...');
+      await new Promise((resolve) => {
+        const checkReady = () => {
+          if (audio.readyState >= 2 || audio.error) {
+            resolve();
+          } else {
+            setTimeout(checkReady, 50);
+          }
+        };
+        checkReady();
+      });
+    }
     
     await audio.play();
     log('Playing HTML5 audio:', src);
@@ -191,8 +326,22 @@ export async function playStartSound(type) {
   const mode = getAudioMode();
   const files = AUDIO_FILES[type] || AUDIO_FILES['bell'];
   
+  log('Playing start sound:', type, 'mode:', mode);
+  
   if (mode === 'html5') {
-    await playHTML5Audio(files.start, 1.0);
+    const success = await playHTML5Audio(files.start, 1.0);
+    if (!success && isIOS) {
+      // iOS fallback: try playing a short silent sound first to unlock
+      log('iOS: Trying unlock fallback for start sound');
+      try {
+        const silent = new Audio('data:audio/wav;base64,UklGRigAAABXQVZFZm10IBAAAAABAAEAQB8AAEAfAAABAAgAZGF0YQQAAAAAAA==');
+        await silent.play();
+        await new Promise(r => setTimeout(r, 100));
+        await playHTML5Audio(files.start, 1.0);
+      } catch (e) {
+        log('iOS: Fallback failed:', e.message);
+      }
+    }
   } else {
     if (type === 'chugpi') {
       playWebAudioStrokes(type, 3, 0);
@@ -403,7 +552,7 @@ function playTempleBell(startTime, velocity = 1.0) {
   addPartial(110,  0.32, 0.015, 16.0);
   addPartial(304,  0.22, 0.010, 11.0);
   addPartial(594,  0.14, 0.008,  8.0);
-  addPartial(982,  0.08, 0.005,  5.5);
+  addPartial(982,  0.08, 0.005, 5.5);
   addPartial(1627, 0.04, 0.004, 3.5);
   
   const shimmerLfo = ctx.createOscillator();
@@ -497,7 +646,7 @@ function playTempleBellHigh(startTime, velocity = 1.0) {
   addPartial(456,  0.22, 0.008,  8.5);
   addPartial(891,  0.14, 0.006,  6.0);
   addPartial(1473, 0.08, 0.004,  4.0);
-  addPartial(2440, 0.04, 0.003,  2.5);
+  addPartial(2440, 0.04, 0.003, 2.5);
   
   const shimmerLfo = ctx.createOscillator();
   shimmerLfo.type = 'sine'; 
