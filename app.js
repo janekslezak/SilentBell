@@ -4,11 +4,9 @@ import { t, initI18n, setLang, getCurrentLang } from './modules/i18n.js';
 import { unlockAudio } from './modules/audio-context.js';
 import { 
   playSingleSound, 
-  playStartSound,
   primeAudio,
   preloadSoundSet, 
-  stopAllAudio,
-  isAudioLoading
+  stopAllAudio
 } from './modules/audio.js';
 import { startSilentLoop, stopSilentLoop } from './modules/silent-loop.js';
 import {
@@ -21,7 +19,7 @@ import {
   setSessionStart, setPlannedDuration, setCurrentSoundForLog
 } from './modules/log.js';
 import { initSettingsRefs, loadSettings, setupSettingsListeners } from './modules/settings.js';
-import { state, loadFromStorage, saveToStorage } from './modules/state.js';
+import { loadFromStorage, saveToStorage } from './modules/state.js';
 import { createDragHandler } from './modules/debounced-drag.js';
 import { setupVisibilityHandler, getWakeLockInfo } from './modules/wakelock.js';
 
@@ -33,8 +31,11 @@ const intervalSelect = document.getElementById('interval-select');
 const displayWrap = document.getElementById('display-wrap');
 
 const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent) && !window.MSStream;
-const isAndroid = /Android/.test(navigator.userAgent);
 const isStandalone = window.navigator.standalone === true || window.matchMedia('(display-mode: standalone)').matches;
+
+// Use NoSleep.min.js from global scope (loaded via script tag in index.html)
+const NoSleep = window.NoSleep;
+let noSleep = null;
 
 const DEBUG = true;
 function log(...args) {
@@ -137,25 +138,6 @@ function setStartButtonLoading(loading) {
   }
 }
 
-// iOS handler: Prime the specific audio element during user gesture
-function handleIOSStart(e) {
-  if (isStarting || btnStart.disabled) {
-    log('Start already in progress, ignoring');
-    return;
-  }
-  
-  log('iOS Start: Priming audio');
-  
-  const currentSound = document.getElementById('settings-sound')?.value || 'bell';
-  
-  // CRITICAL: Prime the audio element (play/pause) during user gesture
-  // This unlocks the specific audio element for later use
-  primeAudio(currentSound);
-  
-  // Continue with async operations
-  processStart(currentSound);
-}
-
 async function processStart(currentSound) {
   try {
     isStarting = true;
@@ -181,39 +163,45 @@ async function processStart(currentSound) {
   }
 }
 
-// Standard handler for non-iOS
-async function handleStandardStart() {
-  if (isStarting || btnStart.disabled) {
-    log('Start already in progress, ignoring');
-    return;
+// iOS handler: Enable NoSleep.min.js synchronously during user gesture
+function handleIOSStart(e) {
+  if (isStarting || btnStart.disabled) return;
+  
+  log('iOS Start: Enabling NoSleep.min.js');
+  
+  // CRITICAL: Create and enable NoSleep synchronously during user gesture
+  if (!noSleep && NoSleep) {
+    noSleep = new NoSleep();
+  }
+  if (noSleep) {
+    noSleep.enable();
   }
   
-  try {
-    log('Standard start');
-    isStarting = true;
-    setStartButtonLoading(true);
-    statusEl.textContent = t('status_preparing') || 'Preparing...';
-    
-    const currentSound = document.getElementById('settings-sound')?.value || 'bell';
-    
-    await unlockAudio();
-    startSilentLoop();
-    
-    const timerState = getTimerState();
-    setSessionStart(Date.now());
-    setPlannedDuration(getTotalSeconds());
-    setCurrentSoundForLog(timerState.currentSound);
-    
-    setStartButtonLoading(false);
-    
-    startCountdown(display, statusEl, btnStart, btnStop, () => {
-      startSession(display, statusEl, btnStart, btnStop, intervalSelect?.value, currentSound);
-    });
-  } catch (error) {
-    log('Start error:', error);
-    setStartButtonLoading(false);
-    statusEl.textContent = t('status_error') || 'Error';
+  const currentSound = document.getElementById('settings-sound')?.value || 'bell';
+  primeAudio(currentSound);
+  processStart(currentSound);
+}
+
+// Standard handler
+async function handleStandardStart() {
+  if (isStarting || btnStart.disabled) return;
+  
+  log('Standard start: Enabling NoSleep.min.js');
+  
+  // Enable NoSleep for all platforms
+  if (!noSleep && NoSleep) {
+    noSleep = new NoSleep();
   }
+  if (noSleep) {
+    await noSleep.enable();
+  }
+  
+  const currentSound = document.getElementById('settings-sound')?.value || 'bell';
+  
+  await unlockAudio();
+  startSilentLoop();
+  
+  processStart(currentSound);
 }
 
 // Attach handlers
@@ -229,6 +217,12 @@ if (btnStart) {
 btnStop?.addEventListener('click', () => {
   try {
     log('Stop button clicked');
+    
+    // Disable NoSleep.min.js when stopping
+    if (noSleep) {
+      noSleep.disable();
+    }
+    
     stopSession(display, statusEl, btnStart, btnStop);
   } catch (error) {
     log('Error stopping session:', error);
@@ -337,9 +331,6 @@ document.getElementById('btn-clear-log')?.addEventListener('click', () => {
     renderLog();
   }
 });
-
-let testAudioPlaying = false;
-let currentTestAudio = null;
 
 document.getElementById('btn-test-sound')?.addEventListener('click', async () => {
   const type = document.getElementById('settings-sound')?.value;
@@ -518,8 +509,9 @@ if (typeof window !== 'undefined') {
 
 function init() {
   log('Initializing Silent Bell v1.3.1...');
-  log('Platform:', isIOS ? 'iOS' : isAndroid ? 'Android' : 'Desktop');
+  log('Platform:', isIOS ? 'iOS' : 'Desktop');
   log('Standalone:', isStandalone);
+  log('NoSleep.min.js available:', !!NoSleep);
   
   initI18n();
   loadFromStorage();
