@@ -1,14 +1,14 @@
 // ─── Silent Bell - Main Application Entry Point ──────────────────
 
 import { t, initI18n, setLang, getCurrentLang } from './modules/i18n.js';
-import { unlockAudio, loadAudioBuffer, scheduleSound, cancelScheduledSound } from './modules/audio-context.js';
+import { unlockAudio } from './modules/audio-context.js';
 import { 
   playSingleSound, 
   playStartSound,
+  playSilentUnlock,
   preloadSoundSet, 
   stopAllAudio,
-  isAudioLoading,
-  getStartSoundFile
+  isAudioLoading
 } from './modules/audio.js';
 import { startSilentLoop, stopSilentLoop } from './modules/silent-loop.js';
 import {
@@ -36,8 +36,6 @@ const displayWrap = document.getElementById('display-wrap');
 const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent) && !window.MSStream;
 const isAndroid = /Android/.test(navigator.userAgent);
 const isStandalone = window.navigator.standalone === true || window.matchMedia('(display-mode: standalone)').matches;
-
-let cancelScheduledStartSound = null;
 
 const DEBUG = true;
 function log(...args) {
@@ -152,25 +150,18 @@ btnStart?.addEventListener('click', async () => {
     statusEl.textContent = t('status_preparing') || 'Preparing audio...';
     
     const currentSound = document.getElementById('settings-sound')?.value || 'bell';
-    const prepareSeconds = parseInt(document.getElementById('settings-prepare')?.value) || 10;
     
-    // For iOS: Unlock audio and schedule the start sound for after countdown
+    // For iOS: Play silent unlock sound IMMEDIATELY (during user gesture)
+    // This unlocks the audio session without the user hearing anything
+    // Then we start silent loop to keep the session alive during countdown
     if (isIOS) {
-      log('iOS: Unlocking and scheduling start sound...');
+      log('iOS: Unlocking audio with silent sound...');
       try {
-        await unlockAudio();
-        
-        // Load the start sound buffer and schedule it
-        const soundFile = getStartSoundFile(currentSound);
-        if (soundFile && prepareSeconds > 0) {
-          const buffer = await loadAudioBuffer(soundFile);
-          cancelScheduledStartSound = scheduleSound(buffer, prepareSeconds, 1.0);
-          log('iOS: Start sound scheduled in', prepareSeconds, 'seconds');
-        }
-        
-        startSilentLoop();
+        await playSilentUnlock(); // 50ms inaudible beep to unlock
+        startSilentLoop();        // Keep session alive during countdown
+        log('iOS: Audio unlocked, silent loop active');
       } catch (e) {
-        log('iOS: Audio setup error:', e.message);
+        log('iOS: Audio unlock error:', e.message);
       }
     } else {
       log('Unlocking audio...');
@@ -190,9 +181,7 @@ btnStart?.addEventListener('click', async () => {
     
     // Start countdown, then begin meditation session
     startCountdown(display, statusEl, btnStart, btnStop, () => {
-      // On iOS, sound was already scheduled, so we don't need to play it again
-      // But we need to clear the cancel function since it played successfully
-      cancelScheduledStartSound = null;
+      // When countdown ends, startSession will play the actual bell sound
       startSession(display, statusEl, btnStart, btnStop, intervalSelect?.value, currentSound);
     });
   } catch (error) {
@@ -205,13 +194,6 @@ btnStart?.addEventListener('click', async () => {
 btnStop?.addEventListener('click', () => {
   try {
     log('Stop button clicked');
-    
-    // Cancel scheduled sound if stopping during countdown (iOS)
-    if (cancelScheduledStartSound) {
-      cancelScheduledStartSound();
-      cancelScheduledStartSound = null;
-    }
-    
     const result = stopSession(display, statusEl, btnStart, btnStop);
     
     if (result.stopped && !result.early) {

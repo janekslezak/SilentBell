@@ -29,6 +29,43 @@ const SOUNDS = {
   }
 };
 
+// Play a silent/quiet sound to unlock audio session without user hearing it
+// Uses Web Audio API for reliable iOS unlocking
+export async function playSilentUnlock() {
+  if (!isIOS) return true;
+  
+  log('Playing silent unlock sound...');
+  
+  try {
+    const AudioCtx = window.AudioContext || window.webkitAudioContext;
+    if (!AudioCtx) return false;
+    
+    const ctx = new AudioCtx();
+    const oscillator = ctx.createOscillator();
+    const gainNode = ctx.createGain();
+    
+    oscillator.frequency.value = 1; // 1Hz - inaudible
+    gainNode.gain.value = 0.001; // Very quiet
+    
+    oscillator.connect(gainNode);
+    gainNode.connect(ctx.destination);
+    
+    oscillator.start();
+    oscillator.stop(ctx.currentTime + 0.05); // 50ms
+    
+    // Also resume context if suspended
+    if (ctx.state === 'suspended') {
+      await ctx.resume();
+    }
+    
+    log('Silent unlock played');
+    return true;
+  } catch (error) {
+    log('Silent unlock failed:', error.message);
+    return false;
+  }
+}
+
 // Play audio - simple and direct
 async function playAudio(src, volume = 1.0) {
   const audio = new Audio(src);

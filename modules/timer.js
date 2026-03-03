@@ -182,19 +182,14 @@ export async function startSession(displayEl, statusEl, btnStart, btnStop, inter
     wakeLockAcquired = false;
   }
   
-  // Play start sound (only for non-iOS, or iOS if no countdown/prepare was used)
-  // On iOS with countdown, the sound was already scheduled in app.js
-  if (!isIOS) {
-    try {
-      log('Playing start sound (non-iOS)...');
-      await playStartSound(sound);
-    } catch (error) {
-      log('Start sound failed:', error.message);
-    }
-  } else {
-    log('iOS: Start sound was scheduled during button tap, playing via Web Audio API');
-    // For iOS, the sound is already scheduled to play via Web Audio API
-    // from the button tap handler in app.js, so we don't need to play it again here
+  // Play the ACTUAL start sound now (for both iOS and non-iOS)
+  // For iOS, audio was unlocked during user gesture with silent sound, now play audible bell
+  // For non-iOS, play normally
+  try {
+    log('Playing start sound...');
+    await playStartSound(sound);
+  } catch (error) {
+    log('Start sound failed:', error.message);
   }
   
   if (statusEl) statusEl.textContent = t('status_meditating');

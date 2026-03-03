@@ -6,13 +6,12 @@ import {
   playIntervalSound as playIOSInterval,
   playEndSound as playIOSEnd,
   playSingleSound as playIOSSingle,
+  playSilentUnlock as playIOSSilentUnlock,
   stopAllAudio as stopIOSAudio,
   startIOSSession,
   stopIOSSession,
   isIOSSessionActive
 } from './ios-audio.js';
-
-import { loadAudioBuffer } from './audio-context.js';
 
 const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent) && !window.MSStream;
 
@@ -103,13 +102,6 @@ export async function preloadSoundSet(soundType) {
   }
 }
 
-// Get file path for sound type
-export function getStartSoundFile(type) {
-  if (type === 'none') return null;
-  const files = AUDIO_FILES[type] || AUDIO_FILES['bell'];
-  return files.start;
-}
-
 // Non-iOS: Simple HTML5 audio playback
 async function playStandardAudio(src, volume = 1.0) {
   try {
@@ -123,6 +115,15 @@ async function playStandardAudio(src, volume = 1.0) {
     log('Playback failed:', error.message);
     return false;
   }
+}
+
+// Silent unlock for iOS
+export async function playSilentUnlock() {
+  if (isIOS) {
+    return await playIOSSilentUnlock();
+  }
+  // Non-iOS: just unlock normally
+  return true;
 }
 
 // Main exported functions
@@ -182,6 +183,6 @@ export function stopAllAudio() {
   });
 }
 
-export { startIOSSession, stopIOSSession, isIOSSessionActive, loadAudioBuffer };
+export { startIOSSession, stopIOSSession, isIOSSessionActive };
 
 log('Audio module loaded, isIOS:', isIOS);
