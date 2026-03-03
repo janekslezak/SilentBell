@@ -25,6 +25,7 @@ let nextIntervalAt = null;
 let wakeLockAcquired = false;
 
 const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent) && !window.MSStream;
+const isAndroid = /Android/.test(navigator.userAgent);
 
 const DEBUG = true;
 function log(...args) {
@@ -248,26 +249,36 @@ async function completeSession(displayEl, statusEl, btnStart, btnStop, currentSo
     log('End sound error:', error.message);
   }
   
-  // Wait for end sound to finish naturally (15s for 13s sound + fade tail)
-  // This prevents Android from cutting off the fade-out prematurely
+  // Different cleanup timing for iOS vs Android
+  // iOS: 12s is enough (sound is ~13s, iOS handles fade well)
+  // Android: 20s to ensure fade-out completes before screen locks
+  const cleanupDelay = isIOS ? 12000 : 20000;
+  
+  log('Scheduling cleanup in', cleanupDelay, 'ms');
+  
+  // Wait for end sound to finish naturally before cleaning up audio
   setTimeout(() => {
     stopSilentLoop();
     stopIOSSession();
     // Only stop audio after the fade has completed
     stopAllAudio();
-  }, 15000);
+    log('Audio cleanup completed');
+  }, cleanupDelay);
   
-  // Keep wake lock until sound finishes to prevent Android audio suspension
+  // Release wake lock sooner than audio cleanup on Android to avoid issues,
+  // but keep it long enough to prevent screen locking during the sound
+  const wakeLockDelay = isIOS ? 10000 : 18000;
+  
   if (wakeLockAcquired) {
     setTimeout(async () => {
       try {
         await releaseWakeLock();
         wakeLockAcquired = false;
-        log('Wake lock released after end sound');
+        log('Wake lock released');
       } catch (e) {
         log('Error releasing wake lock:', e.message);
       }
-    }, 15000);
+    }, wakeLockDelay);
   }
   
   const notesEnabled = get('settings.notes') !== false;
