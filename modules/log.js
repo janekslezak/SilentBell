@@ -88,6 +88,7 @@ function buildEmptyChart(svgW, H, LH, TOPH, colors) {
     // Two-letter weekday format
     const shortLabel = labelDate.toLocaleDateString(locale, { weekday: 'short' });
     const label = shortLabel.substring(0, 2);
+
     
     bars += '<rect x="' + x + '" y="' + (H - 2) + '" width="' + BW +
       '" height="2" rx="1" fill="' + colors.border + '" opacity="0.35"></rect>' +
