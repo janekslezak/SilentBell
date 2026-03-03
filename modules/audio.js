@@ -6,7 +6,7 @@ import {
   playIntervalSound as playIOSInterval,
   playEndSound as playIOSEnd,
   playSingleSound as playIOSSingle,
-  playSilentUnlock as playIOSSilentUnlock,
+  unlockIOSAudio,
   stopAllAudio as stopIOSAudio,
   startIOSSession,
   stopIOSSession,
@@ -117,13 +117,11 @@ async function playStandardAudio(src, volume = 1.0) {
   }
 }
 
-// Silent unlock for iOS
-export async function playSilentUnlock() {
+// Synchronous unlock for iOS Safari
+export function playSilentUnlock() {
   if (isIOS) {
-    return await playIOSSilentUnlock();
+    unlockIOSAudio();
   }
-  // Non-iOS: just unlock normally
-  return true;
 }
 
 // Main exported functions

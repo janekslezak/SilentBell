@@ -8,9 +8,6 @@ function log(...args) {
 
 const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent) && !window.MSStream;
 
-// Silent MP3 data URI (1 frame of silence)
-const SILENT_MP3 = 'data:audio/mp3;base64,//NExAAAAANIAAAAAExBTUUzLjEwMKqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqq//NExAAAAANIAAAAAExBTUUzLjEwMKqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqq//NExAAAAANIAAAAAExBTUUzLjEwMKqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqq';
-
 const SOUNDS = {
   'bell': {
     start: 'sounds/sequence_bell_start.mp3',
@@ -32,34 +29,46 @@ const SOUNDS = {
   }
 };
 
-// Keep a reference to the unlock audio element to prevent garbage collection
-let unlockAudioElement = null;
+// CRITICAL: Keep references to prevent garbage collection on iOS Safari
+const audioPool = [];
+let unlockAudio = null;
 
-// Play a silent sound to unlock audio session for Safari iOS/PWA
-// Must use HTML5 Audio (not Web Audio API) for Safari compatibility
-export async function playSilentUnlock() {
-  if (!isIOS) return true;
+// Play silent unlock SYNCHRONOUSLY (no async/await) for Safari iOS
+// This MUST be called directly in the click handler, not in a promise/async function
+export function unlockIOSAudio() {
+  if (!isIOS) return;
   
-  log('Playing silent unlock for Safari iOS...');
+  log('iOS: Synchronous audio unlock...');
   
   try {
-    // Use HTML5 Audio with silent MP3
-    unlockAudioElement = new Audio(SILENT_MP3);
-    unlockAudioElement.volume = 0.01; // Nearly silent
-    unlockAudioElement.loop = false;
+    // Create a silent oscillator using Web Audio API (synchronous)
+    const AudioCtx = window.AudioContext || window.webkitAudioContext;
+    if (AudioCtx) {
+      const ctx = new AudioCtx();
+      const osc = ctx.createOscillator();
+      const gain = ctx.createGain();
+      
+      osc.frequency.value = 1;
+      gain.gain.value = 0.001;
+      osc.connect(gain);
+      gain.connect(ctx.destination);
+      osc.start();
+      osc.stop(ctx.currentTime + 0.1); // 100ms
+      
+      if (ctx.state === 'suspended') {
+        ctx.resume();
+      }
+    }
     
-    await unlockAudioElement.play();
-    log('Silent unlock played successfully');
+    // Also play a silent HTML5 Audio (synchronous)
+    unlockAudio = new Audio();
+    unlockAudio.src = 'data:audio/wav;base64,UklGRigAAABXQVZFZm10IBIAAAABAAEARKwAAIhYAQACABAAAABkYXRhAgAAAAEA//uQZAA==';
+    unlockAudio.volume = 0.01;
+    unlockAudio.play().catch(() => {});
     
-    // Keep reference for a moment to ensure it completes
-    setTimeout(() => {
-      unlockAudioElement = null;
-    }, 1000);
-    
-    return true;
-  } catch (error) {
-    log('Silent unlock failed:', error.message);
-    return false;
+    log('iOS: Audio unlocked synchronously');
+  } catch (e) {
+    log('iOS: Unlock error:', e.message);
   }
 }
 

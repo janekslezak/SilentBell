@@ -138,37 +138,36 @@ function setStartButtonLoading(loading) {
   }
 }
 
-btnStart?.addEventListener('click', async () => {
+// CRITICAL: This function must be called SYNCHRONOUSLY in the click handler for iOS Safari
+function handleStartClick(e) {
   if (isStarting || btnStart.disabled) {
     log('Start already in progress, ignoring');
     return;
   }
   
+  log('Start button clicked');
+  setStartButtonLoading(true);
+  
+  const currentSound = document.getElementById('settings-sound')?.value || 'bell';
+  
+  // iOS Safari REQUIREMENT: Unlock audio SYNCHRONOUSLY (no await) in the click handler
+  // Even a single await before playing audio will break it in Safari PWA
+  if (isIOS) {
+    log('iOS: Synchronous audio unlock...');
+    playSilentUnlock(); // Call synchronously, no await!
+    startSilentLoop();  // Also synchronous
+  } else {
+    // Non-iOS can use async unlock
+    unlockAudio().then(() => startSilentLoop()).catch(() => {});
+  }
+  
+  // Continue with async operations after the synchronous unlock
+  proceedWithStart(currentSound);
+}
+
+async function proceedWithStart(currentSound) {
   try {
-    log('Start button clicked');
-    setStartButtonLoading(true);
     statusEl.textContent = t('status_preparing') || 'Preparing audio...';
-    
-    const currentSound = document.getElementById('settings-sound')?.value || 'bell';
-    
-    // For iOS Safari/PWA: Unlock HTML5 Audio IMMEDIATELY during user gesture
-    // This must happen synchronously/as early as possible in the click handler
-    if (isIOS) {
-      log('iOS: Unlocking audio for Safari...');
-      try {
-        // Play silent unlock first (HTML5 Audio)
-        await playSilentUnlock();
-        // Then start silent loop to keep Web Audio context alive if needed
-        startSilentLoop();
-        log('iOS: Audio unlocked successfully');
-      } catch (e) {
-        log('iOS: Audio unlock error:', e.message);
-      }
-    } else {
-      log('Unlocking audio...');
-      await unlockAudio();
-      startSilentLoop();
-    }
     
     initNoSleep();
     enableNoSleep();
@@ -182,8 +181,6 @@ btnStart?.addEventListener('click', async () => {
     
     // Start countdown, then begin meditation session
     startCountdown(display, statusEl, btnStart, btnStop, () => {
-      // When countdown ends, play the actual bell sound
-      // On iOS, this should now work because we unlocked HTML5 Audio during the click
       startSession(display, statusEl, btnStart, btnStop, intervalSelect?.value, currentSound);
     });
   } catch (error) {
@@ -191,7 +188,16 @@ btnStart?.addEventListener('click', async () => {
     setStartButtonLoading(false);
     statusEl.textContent = t('status_error') || 'Error - tap to retry';
   }
-});
+}
+
+// Use pointerdown for iOS Safari to ensure it registers as a user gesture
+if (isIOS && btnStart) {
+  // Use both touchstart and click for maximum compatibility
+  btnStart.addEventListener('touchstart', handleStartClick, { passive: false });
+  btnStart.addEventListener('click', handleStartClick);
+} else {
+  btnStart?.addEventListener('click', handleStartClick);
+}
 
 btnStop?.addEventListener('click', () => {
   try {
