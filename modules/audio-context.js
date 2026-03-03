@@ -3,6 +3,8 @@
 
 let audioCtx = null;
 let isUnlocked = false;
+let scheduledSource = null;
+let audioBuffers = new Map();
 
 const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent) && !window.MSStream;
 
@@ -61,6 +63,76 @@ export async function unlockAudio() {
   } catch (e) {
     log('unlockAudio error:', e.message);
     throw e;
+  }
+}
+
+// Load audio file into buffer for scheduling
+export async function loadAudioBuffer(url) {
+  const ctx = getAudioContext();
+  
+  if (audioBuffers.has(url)) {
+    return audioBuffers.get(url);
+  }
+  
+  try {
+    const response = await fetch(url);
+    const arrayBuffer = await response.arrayBuffer();
+    const audioBuffer = await ctx.decodeAudioData(arrayBuffer);
+    audioBuffers.set(url, audioBuffer);
+    log('Loaded audio buffer:', url);
+    return audioBuffer;
+  } catch (e) {
+    log('Failed to load audio buffer:', url, e.message);
+    throw e;
+  }
+}
+
+// Schedule a sound to play after a delay (for iOS countdown)
+export function scheduleSound(buffer, delaySeconds, volume = 1.0) {
+  const ctx = getAudioContext();
+  
+  // Cancel any previously scheduled sound
+  cancelScheduledSound();
+  
+  const source = ctx.createBufferSource();
+  const gainNode = ctx.createGain();
+  
+  source.buffer = buffer;
+  gainNode.gain.value = volume;
+  
+  source.connect(gainNode);
+  gainNode.connect(ctx.destination);
+  
+  const startTime = ctx.currentTime + delaySeconds;
+  source.start(startTime);
+  
+  scheduledSource = source;
+  
+  log('Scheduled sound in', delaySeconds, 'seconds at time', startTime);
+  
+  // Return cancel function
+  return () => {
+    if (scheduledSource) {
+      try {
+        scheduledSource.stop();
+        scheduledSource.disconnect();
+        log('Cancelled scheduled sound');
+      } catch (e) {
+        // Already played or stopped
+      }
+      scheduledSource = null;
+    }
+  };
+}
+
+export function cancelScheduledSound() {
+  if (scheduledSource) {
+    try {
+      scheduledSource.stop();
+      scheduledSource.disconnect();
+    } catch (e) {}
+    scheduledSource = null;
+    log('Cancelled previous scheduled sound');
   }
 }
 
