@@ -108,6 +108,8 @@ function setMeditating(active) {
   if (viewTimer) {
     viewTimer.classList.toggle('meditating', active);
   }
+  document.body.classList.toggle('meditating', active);
+  
   set('timer.isRunning', active);
 }
 
