@@ -1,5 +1,5 @@
 // ─── iOS Audio Module ─────────────────────────────────────────────
-// Safari iOS compatible audio - prime the specific audio element during unlock.
+// Safari iOS compatible audio - prime all sounds during unlock.
 
 const DEBUG = true;
 function log(...args) {
@@ -31,10 +31,9 @@ const SOUNDS = {
 
 // Persistent audio elements
 const audioElements = {};
-let currentSoundType = 'bell';
 let isUnlocked = false;
 
-// Initialize audio elements
+// Initialize audio elements immediately
 function initAudioElements() {
   if (!isIOS) return;
   
@@ -51,35 +50,51 @@ function initAudioElements() {
   });
 }
 
-// CRITICAL: Prime the audio element during user gesture
-// We play and immediately pause to unlock it, then play it later
+// Prime all sounds for a type (unlock them during user gesture)
 export function primeAudio(soundType) {
   if (!isIOS) return;
   
-  currentSoundType = soundType || 'bell';
-  log('Priming audio for:', currentSoundType);
+  const type = soundType || 'bell';
+  log('Priming audio for:', type);
   
   try {
-    const startAudio = audioElements[currentSoundType]?.start;
-    if (!startAudio) return;
-    
-    // Play and immediately pause to unlock this specific element
-    // This satisfies Safari's "user gesture" requirement
-    startAudio.volume = 0; // Mute it for the unlock
-    const playPromise = startAudio.play();
-    
-    if (playPromise !== undefined) {
-      playPromise.then(() => {
-        // Immediately pause and reset
+    // Prime START sound
+    const startAudio = audioElements[type]?.start;
+    if (startAudio) {
+      startAudio.volume = 0;
+      startAudio.play().then(() => {
         startAudio.pause();
         startAudio.currentTime = 0;
-        startAudio.volume = 1; // Restore volume
-        isUnlocked = true;
-        log('Audio primed successfully');
-      }).catch(e => {
-        log('Prime error:', e.message);
-      });
+        startAudio.volume = 1;
+        log('Start sound primed');
+      }).catch(e => log('Start prime error:', e.message));
     }
+    
+    // Prime END sound (critical!)
+    const endAudio = audioElements[type]?.end;
+    if (endAudio) {
+      endAudio.volume = 0;
+      endAudio.play().then(() => {
+        endAudio.pause();
+        endAudio.currentTime = 0;
+        endAudio.volume = 1;
+        log('End sound primed');
+      }).catch(e => log('End prime error:', e.message));
+    }
+    
+    // Prime INTERVAL sound
+    const intervalAudio = audioElements[type]?.interval;
+    if (intervalAudio) {
+      intervalAudio.volume = 0;
+      intervalAudio.play().then(() => {
+        intervalAudio.pause();
+        intervalAudio.currentTime = 0;
+        intervalAudio.volume = 0.8;
+        log('Interval sound primed');
+      }).catch(e => log('Interval prime error:', e.message));
+    }
+    
+    isUnlocked = true;
   } catch (e) {
     log('Prime exception:', e.message);
   }
@@ -89,18 +104,16 @@ export async function playStartSound(soundType) {
   if (!isIOS) return false;
   if (soundType === 'none') return true;
   
-  const type = soundType || currentSoundType;
+  const type = soundType || 'bell';
   log('playStartSound:', type);
   
   const audio = audioElements[type]?.start;
   if (!audio) return false;
   
   try {
-    // Reset and play
     audio.currentTime = 0;
     audio.volume = 1.0;
     await audio.play();
-    log('Start sound playing');
     return true;
   } catch (error) {
     log('Start sound failed:', error.message);
@@ -112,7 +125,7 @@ export async function playIntervalSound(soundType) {
   if (!isIOS) return false;
   if (soundType === 'none') return true;
   
-  const type = soundType || currentSoundType;
+  const type = soundType || 'bell';
   const audio = audioElements[type]?.interval;
   if (!audio) return false;
   
@@ -131,7 +144,7 @@ export async function playEndSound(soundType) {
   if (!isIOS) return false;
   if (soundType === 'none') return true;
   
-  const type = soundType || currentSoundType;
+  const type = soundType || 'bell';
   log('playEndSound:', type);
   
   const audio = audioElements[type]?.end;
@@ -169,16 +182,14 @@ export async function playSingleSound(soundType) {
   }
 }
 
-// For compatibility with old API
-export function playSilentUnlock() {
-  // Deprecated, use primeAudio instead
-}
+// Legacy compatibility
+export function playSilentUnlock() {}
 
 export async function startIOSSession() { return true; }
 export function stopIOSSession() {
   Object.keys(audioElements).forEach(type => {
     ['start', 'interval', 'end'].forEach(key => {
-      const audio = audioElements[type][key];
+      const audio = audioElements[type]?.[key];
       if (audio) {
         audio.pause();
         audio.currentTime = 0;

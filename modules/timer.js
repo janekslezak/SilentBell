@@ -170,26 +170,28 @@ export async function startSession(displayEl, statusEl, btnStart, btnStop, inter
   
   if (!isIOS) {
     startSilentLoop();
+  } else {
+    // For iOS, restart silent loop to ensure it continues
+    stopSilentLoop();
+    startSilentLoop();
   }
   
-  // Acquire wake lock
+  // Acquire wake lock (critical for screen-off)
   try {
     const method = await acquireWakeLock();
     wakeLockAcquired = true;
-    log('Wake lock:', method);
+    log('Wake lock acquired:', method);
   } catch (err) {
     log('Wake lock failed:', err.message);
     wakeLockAcquired = false;
   }
   
-  // Play the ACTUAL start sound now (for both iOS and non-iOS)
-  // For iOS, audio was unlocked during user gesture with silent sound, now play audible bell
-  // For non-iOS, play normally
+  // Play start sound
   try {
     log('Playing start sound...');
     await playStartSound(sound);
   } catch (error) {
-    log('Start sound failed:', error.message);
+    log('Start sound error:', error.message);
   }
   
   if (statusEl) statusEl.textContent = t('status_meditating');
@@ -199,11 +201,11 @@ export async function startSession(displayEl, statusEl, btnStart, btnStop, inter
   setMeditating(true);
   
   timerInterval = setInterval(() => {
-    tick(displayEl, statusEl, btnStart, btnStop);
+    tick(displayEl, statusEl, btnStart, btnStop, sound);
   }, 1000);
 }
 
-function tick(displayEl, statusEl, btnStart, btnStop) {
+function tick(displayEl, statusEl, btnStart, btnStop, currentSound) {
   const now = Date.now();
   const remaining = Math.max(0, Math.round((endTimestamp - now) / 1000));
   
@@ -212,8 +214,6 @@ function tick(displayEl, statusEl, btnStart, btnStop) {
   }
   
   if (intervalBellMs > 0 && nextIntervalAt && now >= nextIntervalAt) {
-    const currentSound = get('audio.currentSound') || 'bell';
-    
     try {
       playIntervalSound(currentSound);
     } catch (error) {
@@ -227,24 +227,25 @@ function tick(displayEl, statusEl, btnStart, btnStop) {
   }
   
   if (remaining <= 0) {
-    completeSession(displayEl, statusEl, btnStart, btnStop);
+    completeSession(displayEl, statusEl, btnStart, btnStop, currentSound);
   }
 }
 
-async function completeSession(displayEl, statusEl, btnStart, btnStop) {
+async function completeSession(displayEl, statusEl, btnStart, btnStop, currentSound) {
   clearInterval(timerInterval);
   timerInterval = null;
   
   setMeditating(false);
   
-  const currentSound = get('audio.currentSound') || 'bell';
+  const sound = currentSound || get('audio.currentSound') || 'bell';
+  
+  log('Session complete, playing end sound:', sound);
   
   try {
-    log('Playing end sound...');
-    await playEndSound(currentSound);
+    await playEndSound(sound);
     log('End sound completed');
   } catch (error) {
-    log('End sound failed:', error.message);
+    log('End sound error:', error.message);
   }
   
   // Cleanup
