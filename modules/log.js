@@ -113,7 +113,7 @@ export function buildWeekChart(sessions) {
     const k = d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0');
     const label = d.toLocaleDateString(
       { pl: 'pl-PL', ko: 'ko-KR', en: 'en-GB' }[getCurrentLang()] || 'en-GB',
-      { weekday: 'narrow' }
+      { weekday: 'short' }
     );
     days.push({ key: k, label: label });
     dayMins[k] = 0;
