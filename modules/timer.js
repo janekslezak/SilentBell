@@ -182,15 +182,13 @@ export async function startSession(displayEl, statusEl, btnStart, btnStop, inter
     wakeLockAcquired = false;
   }
   
-  // For non-iOS: Play start sound now
-  // For iOS: Start sound was already played during user gesture
-  if (!isIOS) {
-    try {
-      log('Playing start sound...');
-      await playStartSound(sound);
-    } catch (error) {
-      log('Start sound failed:', error.message);
-    }
+  // Play the ACTUAL start sound now (for both iOS and non-iOS)
+  // For iOS, audio was unlocked during user gesture with silent sound, now play audible bell
+  try {
+    log('Playing start sound...');
+    await playStartSound(sound);
+  } catch (error) {
+    log('Start sound failed:', error.message);
   }
   
   if (statusEl) statusEl.textContent = t('status_meditating');

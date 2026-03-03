@@ -150,15 +150,16 @@ btnStart?.addEventListener('click', async () => {
     
     const currentSound = document.getElementById('settings-sound')?.value || 'bell';
     
-    // For iOS: Play start sound IMMEDIATELY (during user gesture)
-    // This is critical - iOS requires audio to start during user interaction
+    // For iOS: Unlock audio IMMEDIATELY (during user gesture) with silent sound
+    // This keeps audio session alive during countdown without playing audible bell yet
     if (isIOS) {
-      log('iOS: Playing start sound immediately...');
+      log('iOS: Unlocking audio with silent sound...');
       try {
-        await playStartSound(currentSound);
-        log('iOS: Start sound played');
+        await unlockAudio(); // Plays 10ms beep at 0.1% volume (essentially silent)
+        startSilentLoop();   // Keeps audio context alive during countdown
+        log('iOS: Audio unlocked, silent loop active');
       } catch (e) {
-        log('iOS: Start sound error:', e.message);
+        log('iOS: Audio unlock error:', e.message);
       }
     } else {
       log('Unlocking audio...');
