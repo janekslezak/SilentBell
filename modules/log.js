@@ -105,6 +105,7 @@ export function buildWeekChart(sessions) {
   const W = 7, BW = 28, GAP = 8, H = 56, LH = 18, TOPH = 16;
   const svgW = W * (BW + GAP) - GAP;
   const colors = getChartColors();
+  const locale = { pl: 'pl-PL', ko: 'ko-KR', en: 'en-GB' }[getCurrentLang()] || 'en-GB';
 
   const dayMins = {};
   const days = [];
@@ -112,10 +113,7 @@ export function buildWeekChart(sessions) {
     const d = new Date();
     d.setDate(d.getDate() - i);
     const k = d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0');
-    const label = d.toLocaleDateString(
-      { pl: 'pl-PL', ko: 'ko-KR', en: 'en-GB' }[getCurrentLang()] || 'en-GB',
-      { weekday: 'short' }
-    );
+    const label = d.toLocaleDateString(locale, { weekday: 'short' }).substring(0, 2);
     days.push({ key: k, label: label });
     dayMins[k] = 0;
   }
