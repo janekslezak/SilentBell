@@ -1,5 +1,4 @@
 // ─── Log Module ──────────────────────────────────────────────────
-// Session logging, export, import, and visualization.
 
 import { t, getCurrentLang } from './i18n.js';
 
@@ -9,11 +8,6 @@ let currentSound = 'bell';
 
 // Chart mode state: 'week' or 'average'
 let chartMode = localStorage.getItem('log_chart_mode') || 'week';
-
-const DEBUG = true;
-function log(...args) {
-  if (DEBUG) console.log('[Log]', ...args);
-}
 
 export function setSessionStart(start) { sessionStart = start; }
 export function setPlannedDuration(duration) { plannedDuration = duration; }
@@ -240,9 +234,14 @@ export function buildWeekdayAverageChart(sessions) {
     return barRect + minLabel + dayLabel;
   }).join('');
   
+  // Add "avg" indicator
+  var avgIndicator = '<text x="' + (svgW / 2) + '" y="12" text-anchor="middle" ' +
+    'font-size="10" fill="' + colors.muted + '" opacity="0.7">';
+
   return '<svg width="100%" viewBox="0 0 ' + svgW + ' ' + (H + LH + TOPH) +
     '" style="display:block;margin:14px 0 6px">' +
-    '<g transform="translate(0,' + TOPH + ')">' + bars + '</g></svg>';
+    '<g transform="translate(0,' + TOPH + ')">' + bars + '</g>' +
+    avgIndicator + '</svg>';
 }
 
 // ─── Chart Mode Management ────────────────────────────────────────
@@ -359,7 +358,6 @@ export function saveSession(completed, actualSecs, note) {
     note: note || ''
   });
   localStorage.setItem('meditation_log', JSON.stringify(sessions));
-  log('Session saved, total sessions:', sessions.length);
 }
 
 // ─── Session Note ─────────────────────────────────────────────────
@@ -396,11 +394,6 @@ export function showNoteField(completed, actualSecs) {
 
 export function exportCSV() {
   var sessions = getSessions();
-  if (sessions.length === 0) {
-    alert(t('export_error') + ': ' + 'No sessions to export');
-    return;
-  }
-  
   var rows = [['Date', 'Start', 'Planned (s)', 'Actual (s)', 'Completed', 'Sound', 'Note']].concat(
     sessions.map(function(s) {
       return [
@@ -412,9 +405,8 @@ export function exportCSV() {
   var csv = rows.map(function(r) { return r.join(','); }).join('\n');
   var a = document.createElement('a');
   a.href = URL.createObjectURL(new Blob([csv], { type: 'text/csv' }));
-  a.download = 'meditation_log_' + new Date().toISOString().split('T')[0] + '.csv';
+  a.download = 'meditation_log.csv';
   a.click();
-  log('CSV exported:', sessions.length, 'sessions');
 }
 
 // ─── CSV Import ───────────────────────────────────────────────────
@@ -494,7 +486,6 @@ export function importCSV(file, onSuccess, onError) {
       localStorage.setItem('meditation_log', JSON.stringify(merged));
       renderLog();
       onSuccess(imported.length);
-      log('CSV imported:', imported.length, 'sessions');
     } catch(err) {
       onError(err.message);
     }
@@ -580,12 +571,10 @@ export function saveManualSession(dateStr, timeStr, durationMins, note) {
   });
   sessions.sort(function(a, b) { return b.id - a.id; });
   localStorage.setItem('meditation_log', JSON.stringify(sessions));
-  log('Manual session saved');
 }
 
 // ─── Clear Log ────────────────────────────────────────────────────
 
 export function clearLog() {
   localStorage.removeItem('meditation_log');
-  log('Log cleared');
 }

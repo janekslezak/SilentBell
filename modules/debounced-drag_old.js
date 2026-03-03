@@ -1,6 +1,6 @@
-// ─── Debounced Drag Handler Module ───────────────────────────────
-// Provides smooth drag interactions with debouncing and haptic feedback.
-// Optimized for touchscreen time adjustment.
+// ─── Debounced Drag Interactions Module ──────────────────────────
+// Provides optimized touch/mouse drag handling with debouncing,
+// throttling, and smooth value interpolation for the timer display.
 
 // Default configuration
 const DEFAULT_CONFIG = {
@@ -8,9 +8,9 @@ const DEFAULT_CONFIG = {
   debounceMs: 16,           // ~60fps
   throttleMs: 16,           // ~60fps
   
-  // Drag sensitivity - optimized for touch
-  pixelsPerUnit: 8,         // Pixels to drag for one unit change (lower = more sensitive)
-  minDelta: 3,              // Minimum pixel delta to register
+  // Drag sensitivity
+  pixelsPerUnit: 12,        // Pixels to drag for one unit change
+  minDelta: 2,              // Minimum pixel delta to register
   
   // Value constraints
   minValue: 60,             // Minimum seconds (1 minute)
@@ -18,11 +18,11 @@ const DEFAULT_CONFIG = {
   
   // Smoothing
   smoothing: true,          // Enable value smoothing
-  smoothingFactor: 0.4,     // Lower = smoother but more lag
+  smoothingFactor: 0.3,     // Lower = smoother but more lag
   
   // Haptic feedback
   hapticFeedback: true,     // Enable vibration on value change
-  hapticDuration: 12,       // Vibration duration in ms
+  hapticDuration: 10,       // Vibration duration in ms
   
   // Visual feedback
   visualFeedback: true      // Show drag indicator
@@ -39,15 +39,9 @@ class DragHandler {
     this.startY = 0;
     this.startX = 0;
     this.currentY = 0;
-    this.currentX = 0;
     this.currentValue = 0;
     this.startValue = 0;
     this.dragUnit = 60;      // 60 for minutes (left), 1 for seconds (right)
-    
-    // Touch tracking for better gesture detection
-    this.touchStartTime = 0;
-    this.isTouch = false;
-    this.verticalDrag = false;
     
     // Debounce state
     this.lastUpdateTime = 0;
@@ -71,7 +65,6 @@ class DragHandler {
     this._handleMouseDown = this._handleMouseDown.bind(this);
     this._handleMouseMove = this._handleMouseMove.bind(this);
     this._handleMouseUp = this._handleMouseUp.bind(this);
-    this._handleWheel = this._handleWheel.bind(this);
     this._updateValue = this._updateValue.bind(this);
     
     // Initialize
@@ -82,17 +75,14 @@ class DragHandler {
   _init() {
     if (!this.element) return;
     
-    // Touch events - use passive for start, active for move
-    this.element.addEventListener('touchstart', this._handleTouchStart, { passive: false });
-    this.element.addEventListener('touchmove', this._handleTouchMove, { passive: false });
+    // Touch events
+    this.element.addEventListener('touchstart', this._handleTouchStart, { passive: true });
+    this.element.addEventListener('touchmove', this._handleTouchMove, { passive: true });
     this.element.addEventListener('touchend', this._handleTouchEnd, { passive: true });
     this.element.addEventListener('touchcancel', this._handleTouchEnd, { passive: true });
     
     // Mouse events
     this.element.addEventListener('mousedown', this._handleMouseDown);
-    
-    // Wheel/scroll for desktop
-    this.element.addEventListener('wheel', this._handleWheel, { passive: false });
     
     // Prevent default drag behavior
     this.element.addEventListener('dragstart', (e) => e.preventDefault());
@@ -101,11 +91,6 @@ class DragHandler {
     if (this.config.visualFeedback) {
       this._createVisualIndicator();
     }
-    
-    // Set touch-action for better mobile handling
-    this.element.style.touchAction = 'none';
-    this.element.style.userSelect = 'none';
-    this.element.style.webkitUserSelect = 'none';
   }
 
   // Create visual drag indicator
@@ -132,12 +117,12 @@ class DragHandler {
       top: 50%;
       left: 50%;
       transform: translate(-50%, -50%);
-      width: 100px;
-      height: 100px;
+      width: 80px;
+      height: 80px;
       border-radius: 50%;
       background: var(--accent, #88c0d0);
-      opacity: 0.08;
-      transition: transform 0.1s, opacity 0.1s;
+      opacity: 0.1;
+      transition: transform 0.1s;
     `;
     
     this.indicator.appendChild(inner);
@@ -151,7 +136,6 @@ class DragHandler {
     if (this.indicator) {
       this.indicator.style.opacity = '1';
     }
-    this.element.style.cursor = 'grabbing';
   }
 
   // Hide visual indicator
@@ -159,71 +143,45 @@ class DragHandler {
     if (this.indicator) {
       this.indicator.style.opacity = '0';
     }
-    this.element.style.cursor = '';
   }
 
   // Update indicator based on drag
   _updateIndicator(deltaY) {
     if (!this.indicatorInner) return;
     
-    const scale = 1 + Math.min(Math.abs(deltaY) / 80, 0.25);
+    const scale = 1 + Math.min(Math.abs(deltaY) / 100, 0.3);
     const direction = deltaY > 0 ? -1 : 1;
-    this.indicatorInner.style.transform = `translate(-50%, -50%) scale(${scale}) translateY(${direction * 3}px)`;
-    this.indicatorInner.style.opacity = Math.min(0.15 + Math.abs(deltaY) / 500, 0.25).toString();
+    this.indicatorInner.style.transform = `translate(-50%, -50%) scale(${scale}) translateY(${direction * 5}px)`;
   }
 
-  // Handle touch start - optimized for immediate response
+  // Handle touch start
   _handleTouchStart(e) {
     if (this._shouldIgnore()) return;
     
     const touch = e.touches[0];
-    this.isTouch = true;
-    this.verticalDrag = false;
-    
     const rect = this.element.getBoundingClientRect();
-    this._startDrag(touch.clientX, touch.clientY, rect);
-    this.touchStartTime = Date.now();
     
-    // Prevent default to avoid scrolling conflicts
-    // but only if we're actually on the timer display
-    if (e.target.closest('#display-wrap') || e.target.closest('#display')) {
-      e.preventDefault();
-    }
+    this._startDrag(touch.clientX, touch.clientY, rect);
   }
 
-  // Handle touch move - improved gesture detection
+  // Handle touch move
   _handleTouchMove(e) {
     if (!this.isDragging) return;
     
     const touch = e.touches[0];
-    const deltaX = touch.clientX - this.startX;
-    const deltaY = this.startY - touch.clientY;
-    
-    // Determine drag direction on first significant movement
-    if (!this.verticalDrag && (Math.abs(deltaX) > 5 || Math.abs(deltaY) > 5)) {
-      this.verticalDrag = Math.abs(deltaY) >= Math.abs(deltaX);
-    }
-    
-    // Only process if this is primarily a vertical drag
-    if (this.verticalDrag) {
-      e.preventDefault(); // Prevent page scroll
-      this._updateDrag(touch.clientX, touch.clientY);
-    }
+    this._updateDrag(touch.clientX, touch.clientY);
   }
 
   // Handle touch end
   _handleTouchEnd(e) {
     if (!this.isDragging) return;
     
-    this.isTouch = false;
-    this.verticalDrag = false;
     this._endDrag();
   }
 
   // Handle mouse down
   _handleMouseDown(e) {
     if (this._shouldIgnore()) return;
-    if (this.isTouch) return; // Ignore mouse events on touch devices
     
     const rect = this.element.getBoundingClientRect();
     this._startDrag(e.clientX, e.clientY, rect);
@@ -254,44 +212,9 @@ class DragHandler {
     document.removeEventListener('mouseup', this._handleMouseUp);
   }
 
-  // Handle wheel/scroll
-  _handleWheel(e) {
-    if (this._shouldIgnore()) return;
-    
-    e.preventDefault();
-    
-    // Get current value
-    const currentValue = this.config.getValue ? this.config.getValue() : 0;
-    this.startValue = currentValue;
-    this.smoothedValue = currentValue;
-    this.targetValue = currentValue;
-    this.currentValue = currentValue;
-    
-    // Determine direction and amount
-    const delta = e.deltaY > 0 ? -60 : 60; // 1 minute per wheel tick
-    this.targetValue = Math.max(
-      this.config.minValue,
-      Math.min(this.config.maxValue, currentValue + delta)
-    );
-    
-    // Apply immediately
-    this._applyValue(Math.round(this.targetValue));
-    
-    // Debounce the end callback
-    if (this.rafId) {
-      cancelAnimationFrame(this.rafId);
-    }
-    
-    this.rafId = requestAnimationFrame(() => {
-      if (this.onEnd) {
-        this.onEnd({ value: this.currentValue });
-      }
-      this.rafId = null;
-    });
-  }
-
   // Check if drag should be ignored
   _shouldIgnore() {
+    // Override in options
     if (this.config.shouldIgnore) {
       return this.config.shouldIgnore();
     }
@@ -304,7 +227,6 @@ class DragHandler {
     this.startY = clientY;
     this.startX = clientX;
     this.currentY = clientY;
-    this.currentX = clientX;
     
     // Determine drag unit based on horizontal position
     const relativeX = clientX - rect.left;
@@ -331,18 +253,15 @@ class DragHandler {
   // Update drag operation
   _updateDrag(clientX, clientY) {
     this.currentY = clientY;
-    this.currentX = clientX;
     
-    // Use vertical movement for time adjustment (more natural)
     const deltaY = this.startY - clientY;
     const absDelta = Math.abs(deltaY);
     
     // Apply minimum delta threshold
     if (absDelta < this.config.minDelta) return;
     
-    // Calculate raw value change - more sensitive for touch
-    const sensitivity = this.isTouch ? this.config.pixelsPerUnit : this.config.pixelsPerUnit * 1.5;
-    const rawDelta = Math.round(deltaY / sensitivity);
+    // Calculate raw value change
+    const rawDelta = Math.round(deltaY / this.config.pixelsPerUnit);
     const newValue = this.startValue + rawDelta * this.dragUnit;
     
     // Clamp to constraints
@@ -395,7 +314,7 @@ class DragHandler {
     const now = performance.now();
     const elapsed = now - this.lastUpdateTime;
     
-    // Throttle updates for performance
+    // Throttle updates
     if (elapsed < this.config.throttleMs) {
       if (!this.rafId) {
         this.rafId = requestAnimationFrame(() => {
@@ -495,7 +414,6 @@ class DragHandler {
       this.element.removeEventListener('touchend', this._handleTouchEnd);
       this.element.removeEventListener('touchcancel', this._handleTouchEnd);
       this.element.removeEventListener('mousedown', this._handleMouseDown);
-      this.element.removeEventListener('wheel', this._handleWheel);
     }
     
     document.removeEventListener('mousemove', this._handleMouseMove);
