@@ -1,5 +1,5 @@
 // ─── iOS Audio Module ─────────────────────────────────────────────
-// Simple iOS audio handling - play sounds directly during user gesture.
+// Safari iOS compatible audio using persistent elements.
 
 const DEBUG = true;
 function log(...args) {
@@ -29,71 +29,109 @@ const SOUNDS = {
   }
 };
 
-// CRITICAL: Keep references to prevent garbage collection on iOS Safari
-const audioPool = [];
-let unlockAudio = null;
+// CRITICAL: Safari iOS requires persistent audio elements
+// We create them upfront and reuse the same elements
+const audioPool = {
+  start: null,
+  interval: null,
+  end: null,
+  unlock: null
+};
 
-// Play silent unlock SYNCHRONOUSLY (no async/await) for Safari iOS
-// This MUST be called directly in the click handler, not in a promise/async function
-export function unlockIOSAudio() {
+let isUnlocked = false;
+
+// Initialize audio elements immediately (but don't play yet)
+function initAudioElements() {
   if (!isIOS) return;
   
-  log('iOS: Synchronous audio unlock...');
+  // Create unlock audio (silent)
+  audioPool.unlock = new Audio();
+  audioPool.unlock.src = 'data:audio/wav;base64,UklGRigAAABXQVZFZm10IBIAAAABAAEARKwAAIhYAQACABAAAABkYXRhAgAAAAEA//uQZAA==';
+  audioPool.unlock.preload = 'auto';
+  
+  // Create pool for each sound type
+  Object.keys(SOUNDS).forEach(type => {
+    if (!audioPool[type]) {
+      audioPool[type] = {};
+    }
+    ['start', 'interval', 'end'].forEach(key => {
+      if (!audioPool[type][key]) {
+        audioPool[type][key] = new Audio();
+        audioPool[type][key].src = SOUNDS[type][key];
+        audioPool[type][key].preload = 'auto';
+        audioPool[type][key].load();
+      }
+    });
+  });
+  
+  log('Audio elements initialized');
+}
+
+// SYNCHRONOUS unlock - must be called directly in click handler
+export function unlockIOSAudio() {
+  if (!isIOS || isUnlocked) return;
+  
+  log('iOS: Synchronous unlock...');
   
   try {
-    // Create a silent oscillator using Web Audio API (synchronous)
-    const AudioCtx = window.AudioContext || window.webkitAudioContext;
-    if (AudioCtx) {
-      const ctx = new AudioCtx();
-      const osc = ctx.createOscillator();
-      const gain = ctx.createGain();
-      
-      osc.frequency.value = 1;
-      gain.gain.value = 0.001;
-      osc.connect(gain);
-      gain.connect(ctx.destination);
-      osc.start();
-      osc.stop(ctx.currentTime + 0.1); // 100ms
-      
-      if (ctx.state === 'suspended') {
-        ctx.resume();
-      }
+    // Play the unlock audio synchronously
+    if (audioPool.unlock) {
+      audioPool.unlock.volume = 0.01;
+      audioPool.unlock.play().catch(() => {});
     }
     
-    // Also play a silent HTML5 Audio (synchronous)
-    unlockAudio = new Audio();
-    unlockAudio.src = 'data:audio/wav;base64,UklGRigAAABXQVZFZm10IBIAAAABAAEARKwAAIhYAQACABAAAABkYXRhAgAAAAEA//uQZAA==';
-    unlockAudio.volume = 0.01;
-    unlockAudio.play().catch(() => {});
+    // Also try to preload/play all sounds to ensure they're ready
+    Object.keys(SOUNDS).forEach(type => {
+      ['start', 'interval', 'end'].forEach(key => {
+        const audio = audioPool[type]?.[key];
+        if (audio) {
+          // Load but don't play yet
+          audio.load();
+        }
+      });
+    });
     
-    log('iOS: Audio unlocked synchronously');
+    isUnlocked = true;
+    log('iOS: Audio unlocked');
   } catch (e) {
     log('iOS: Unlock error:', e.message);
   }
 }
 
-// Play audio - simple and direct
-async function playAudio(src, volume = 1.0) {
-  const audio = new Audio(src);
-  audio.volume = volume;
-  audio.preload = 'auto';
+// Play sound using the persistent audio element
+async function playPooledSound(type, key, volume = 1.0) {
+  if (!isIOS) return false;
+  if (!isUnlocked) {
+    log('Audio not unlocked yet!');
+    return false;
+  }
   
-  return new Promise((resolve, reject) => {
-    audio.addEventListener('canplaythrough', async () => {
-      try {
-        await audio.play();
-        resolve(audio);
-      } catch (err) {
-        reject(err);
-      }
-    }, { once: true });
-    
-    audio.addEventListener('error', () => {
-      reject(new Error('Audio load error'));
-    }, { once: true });
-    
-    audio.load();
-  });
+  const audio = audioPool[type]?.[key];
+  if (!audio) return false;
+  
+  try {
+    // Reset and play
+    audio.volume = volume;
+    audio.currentTime = 0;
+    await audio.play();
+    return true;
+  } catch (error) {
+    log('Play error:', error.message);
+    // Fallback: try creating new audio
+    return playFallback(SOUNDS[type][key], volume);
+  }
+}
+
+// Fallback if pooled audio fails
+async function playFallback(src, volume = 1.0) {
+  try {
+    const audio = new Audio(src);
+    audio.volume = volume;
+    await audio.play();
+    return true;
+  } catch (e) {
+    return false;
+  }
 }
 
 export async function playStartSound(soundType) {
@@ -101,18 +139,11 @@ export async function playStartSound(soundType) {
   if (soundType === 'none') return true;
   
   const type = soundType || 'bell';
-  const src = SOUNDS[type]?.start || SOUNDS['bell'].start;
-  
   log('playStartSound:', type);
   
-  try {
-    await playAudio(src, 1.0);
-    log('Start sound OK');
-    return true;
-  } catch (error) {
-    log('Start sound failed:', error.message);
-    return false;
-  }
+  const result = await playPooledSound(type, 'start', 1.0);
+  if (result) log('Start sound OK');
+  return result;
 }
 
 export async function playIntervalSound(soundType) {
@@ -120,15 +151,7 @@ export async function playIntervalSound(soundType) {
   if (soundType === 'none') return true;
   
   const type = soundType || 'bell';
-  const src = SOUNDS[type]?.interval || SOUNDS['bell'].interval;
-  
-  try {
-    await playAudio(src, 0.8);
-    return true;
-  } catch (error) {
-    log('Interval sound failed:', error.message);
-    return false;
-  }
+  return await playPooledSound(type, 'interval', 0.8);
 }
 
 export async function playEndSound(soundType) {
@@ -136,18 +159,11 @@ export async function playEndSound(soundType) {
   if (soundType === 'none') return true;
   
   const type = soundType || 'bell';
-  const src = SOUNDS[type]?.end || SOUNDS['bell'].end;
-  
   log('playEndSound:', type);
   
-  try {
-    await playAudio(src, 1.0);
-    log('End sound OK');
-    return true;
-  } catch (error) {
-    log('End sound failed:', error.message);
-    return false;
-  }
+  const result = await playPooledSound(type, 'end', 1.0);
+  if (result) log('End sound OK');
+  return result;
 }
 
 export async function playSingleSound(soundType) {
@@ -159,8 +175,11 @@ export async function playSingleSound(soundType) {
   
   log('playSingleSound:', type);
   
+  // For test sound, we can try pooled or fallback
   try {
-    await playAudio(src, 1.0);
+    const audio = new Audio(src);
+    audio.volume = 1.0;
+    await audio.play();
     return true;
   } catch (error) {
     log('Single sound failed:', error.message);
@@ -170,8 +189,28 @@ export async function playSingleSound(soundType) {
 
 // No-op functions for API compatibility
 export async function startIOSSession() { return true; }
-export function stopIOSSession() {}
-export function stopAllAudio() {}
-export function isIOSSessionActive() { return false; }
+export function stopIOSSession() {
+  // Stop all pooled audio
+  Object.values(audioPool).forEach(pool => {
+    if (pool && typeof pool === 'object' && pool.pause) {
+      pool.pause();
+      pool.currentTime = 0;
+    } else if (pool && typeof pool === 'object') {
+      Object.values(pool).forEach(audio => {
+        if (audio && audio.pause) {
+          audio.pause();
+          audio.currentTime = 0;
+        }
+      });
+    }
+  });
+}
+export function stopAllAudio() {
+  stopIOSSession();
+}
+export function isIOSSessionActive() { return isUnlocked; }
+
+// Initialize on load
+initAudioElements();
 
 log('iOS Audio module loaded, isIOS:', isIOS);

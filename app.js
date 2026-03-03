@@ -5,7 +5,7 @@ import { unlockAudio } from './modules/audio-context.js';
 import { 
   playSingleSound, 
   playStartSound,
-  playSilentUnlock,
+  unlockIOSAudio,
   preloadSoundSet, 
   stopAllAudio,
   isAudioLoading
@@ -138,37 +138,32 @@ function setStartButtonLoading(loading) {
   }
 }
 
-// CRITICAL: This function must be called SYNCHRONOUSLY in the click handler for iOS Safari
-function handleStartClick(e) {
-  if (isStarting || btnStart.disabled) {
-    log('Start already in progress, ignoring');
-    return;
-  }
+// CRITICAL SAFARI FIX: The unlock must happen SYNCHRONOUSLY in the event handler
+// with ZERO async operations before it
+function handleIOSStart(e) {
+  // Prevent default to ensure we control the timing
+  if (e.type === 'touchstart') e.preventDefault();
   
-  log('Start button clicked');
-  setStartButtonLoading(true);
+  if (isStarting || btnStart.disabled) return;
   
-  const currentSound = document.getElementById('settings-sound')?.value || 'bell';
+  log('iOS Start: Synchronous unlock');
   
-  // iOS Safari REQUIREMENT: Unlock audio SYNCHRONOUSLY (no await) in the click handler
-  // Even a single await before playing audio will break it in Safari PWA
-  if (isIOS) {
-    log('iOS: Synchronous audio unlock...');
-    playSilentUnlock(); // Call synchronously, no await!
-    startSilentLoop();  // Also synchronous
-  } else {
-    // Non-iOS can use async unlock
-    unlockAudio().then(() => startSilentLoop()).catch(() => {});
-  }
+  // SYNCHRONOUS unlock - call immediately, no await!
+  unlockIOSAudio();
   
-  // Continue with async operations after the synchronous unlock
-  proceedWithStart(currentSound);
+  // Start the async process after unlocking
+  processStart();
 }
 
-async function proceedWithStart(currentSound) {
+async function processStart() {
   try {
-    statusEl.textContent = t('status_preparing') || 'Preparing audio...';
+    isStarting = true;
+    setStartButtonLoading(true);
+    statusEl.textContent = t('status_preparing') || 'Preparing...';
     
+    const currentSound = document.getElementById('settings-sound')?.value || 'bell';
+    
+    startSilentLoop();
     initNoSleep();
     enableNoSleep();
     
@@ -179,24 +174,59 @@ async function proceedWithStart(currentSound) {
     
     setStartButtonLoading(false);
     
-    // Start countdown, then begin meditation session
+    // Start countdown
+    startCountdown(display, statusEl, btnStart, btnStop, () => {
+      // When countdown ends, play the bell
+      startSession(display, statusEl, btnStart, btnStop, intervalSelect?.value, currentSound);
+    });
+  } catch (error) {
+    log('Start error:', error);
+    setStartButtonLoading(false);
+    statusEl.textContent = t('status_error') || 'Error';
+  }
+}
+
+// Standard handler for non-iOS
+async function handleStandardStart() {
+  if (isStarting || btnStart.disabled) return;
+  
+  try {
+    log('Standard start');
+    setStartButtonLoading(true);
+    statusEl.textContent = t('status_preparing') || 'Preparing...';
+    
+    const currentSound = document.getElementById('settings-sound')?.value || 'bell';
+    
+    await unlockAudio();
+    startSilentLoop();
+    initNoSleep();
+    enableNoSleep();
+    
+    const timerState = getTimerState();
+    setSessionStart(Date.now());
+    setPlannedDuration(getTotalSeconds());
+    setCurrentSoundForLog(timerState.currentSound);
+    
+    setStartButtonLoading(false);
+    
     startCountdown(display, statusEl, btnStart, btnStop, () => {
       startSession(display, statusEl, btnStart, btnStop, intervalSelect?.value, currentSound);
     });
   } catch (error) {
-    log('Start session failed:', error);
+    log('Start error:', error);
     setStartButtonLoading(false);
-    statusEl.textContent = t('status_error') || 'Error - tap to retry';
   }
 }
 
-// Use pointerdown for iOS Safari to ensure it registers as a user gesture
-if (isIOS && btnStart) {
-  // Use both touchstart and click for maximum compatibility
-  btnStart.addEventListener('touchstart', handleStartClick, { passive: false });
-  btnStart.addEventListener('click', handleStartClick);
-} else {
-  btnStart?.addEventListener('click', handleStartClick);
+// Attach handlers
+if (btnStart) {
+  if (isIOS) {
+    // iOS needs touchstart for immediate response, and click as backup
+    btnStart.addEventListener('touchstart', handleIOSStart, { passive: false });
+    btnStart.addEventListener('click', handleIOSStart);
+  } else {
+    btnStart.addEventListener('click', handleStandardStart);
+  }
 }
 
 btnStop?.addEventListener('click', () => {
