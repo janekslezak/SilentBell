@@ -8,6 +8,9 @@ function log(...args) {
 
 const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent) && !window.MSStream;
 
+// Silent MP3 data URI (1 frame of silence)
+const SILENT_MP3 = 'data:audio/mp3;base64,//NExAAAAANIAAAAAExBTUUzLjEwMKqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqq//NExAAAAANIAAAAAExBTUUzLjEwMKqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqq//NExAAAAANIAAAAAExBTUUzLjEwMKqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqq';
+
 const SOUNDS = {
   'bell': {
     start: 'sounds/sequence_bell_start.mp3',
@@ -29,36 +32,30 @@ const SOUNDS = {
   }
 };
 
-// Play a silent/quiet sound to unlock audio session without user hearing it
-// Uses Web Audio API for reliable iOS unlocking
+// Keep a reference to the unlock audio element to prevent garbage collection
+let unlockAudioElement = null;
+
+// Play a silent sound to unlock audio session for Safari iOS/PWA
+// Must use HTML5 Audio (not Web Audio API) for Safari compatibility
 export async function playSilentUnlock() {
   if (!isIOS) return true;
   
-  log('Playing silent unlock sound...');
+  log('Playing silent unlock for Safari iOS...');
   
   try {
-    const AudioCtx = window.AudioContext || window.webkitAudioContext;
-    if (!AudioCtx) return false;
+    // Use HTML5 Audio with silent MP3
+    unlockAudioElement = new Audio(SILENT_MP3);
+    unlockAudioElement.volume = 0.01; // Nearly silent
+    unlockAudioElement.loop = false;
     
-    const ctx = new AudioCtx();
-    const oscillator = ctx.createOscillator();
-    const gainNode = ctx.createGain();
+    await unlockAudioElement.play();
+    log('Silent unlock played successfully');
     
-    oscillator.frequency.value = 1; // 1Hz - inaudible
-    gainNode.gain.value = 0.001; // Very quiet
+    // Keep reference for a moment to ensure it completes
+    setTimeout(() => {
+      unlockAudioElement = null;
+    }, 1000);
     
-    oscillator.connect(gainNode);
-    gainNode.connect(ctx.destination);
-    
-    oscillator.start();
-    oscillator.stop(ctx.currentTime + 0.05); // 50ms
-    
-    // Also resume context if suspended
-    if (ctx.state === 'suspended') {
-      await ctx.resume();
-    }
-    
-    log('Silent unlock played');
     return true;
   } catch (error) {
     log('Silent unlock failed:', error.message);

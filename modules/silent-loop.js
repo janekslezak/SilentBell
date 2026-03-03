@@ -29,12 +29,14 @@ export function startSilentLoop() {
       return;
     }
     
+    // For iOS Safari, we need to be careful not to interfere with HTML5 Audio
+    // So we use a very conservative approach
     audioContext = new AudioCtx();
     oscillator = audioContext.createOscillator();
     gainNode = audioContext.createGain();
     
-    oscillator.frequency.value = 1;
-    gainNode.gain.value = 0.0001;
+    oscillator.frequency.value = 1; // 1Hz - essentially silent
+    gainNode.gain.value = 0.0001; // Very low volume
     
     oscillator.connect(gainNode);
     gainNode.connect(audioContext.destination);

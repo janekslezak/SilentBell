@@ -151,15 +151,16 @@ btnStart?.addEventListener('click', async () => {
     
     const currentSound = document.getElementById('settings-sound')?.value || 'bell';
     
-    // For iOS: Play silent unlock sound IMMEDIATELY (during user gesture)
-    // This unlocks the audio session without the user hearing anything
-    // Then we start silent loop to keep the session alive during countdown
+    // For iOS Safari/PWA: Unlock HTML5 Audio IMMEDIATELY during user gesture
+    // This must happen synchronously/as early as possible in the click handler
     if (isIOS) {
-      log('iOS: Unlocking audio with silent sound...');
+      log('iOS: Unlocking audio for Safari...');
       try {
-        await playSilentUnlock(); // 50ms inaudible beep to unlock
-        startSilentLoop();        // Keep session alive during countdown
-        log('iOS: Audio unlocked, silent loop active');
+        // Play silent unlock first (HTML5 Audio)
+        await playSilentUnlock();
+        // Then start silent loop to keep Web Audio context alive if needed
+        startSilentLoop();
+        log('iOS: Audio unlocked successfully');
       } catch (e) {
         log('iOS: Audio unlock error:', e.message);
       }
@@ -181,7 +182,8 @@ btnStart?.addEventListener('click', async () => {
     
     // Start countdown, then begin meditation session
     startCountdown(display, statusEl, btnStart, btnStop, () => {
-      // When countdown ends, startSession will play the actual bell sound
+      // When countdown ends, play the actual bell sound
+      // On iOS, this should now work because we unlocked HTML5 Audio during the click
       startSession(display, statusEl, btnStart, btnStop, intervalSelect?.value, currentSound);
     });
   } catch (error) {
