@@ -248,20 +248,26 @@ async function completeSession(displayEl, statusEl, btnStart, btnStop, currentSo
     log('End sound error:', error.message);
   }
   
-  // Cleanup
+  // Wait for end sound to finish naturally (15s for 13s sound + fade tail)
+  // This prevents Android from cutting off the fade-out prematurely
   setTimeout(() => {
     stopSilentLoop();
     stopIOSSession();
+    // Only stop audio after the fade has completed
     stopAllAudio();
-  }, 10000);
+  }, 15000);
   
+  // Keep wake lock until sound finishes to prevent Android audio suspension
   if (wakeLockAcquired) {
-    try {
-      await releaseWakeLock();
-      wakeLockAcquired = false;
-    } catch (e) {
-      log('Error releasing wake lock:', e.message);
-    }
+    setTimeout(async () => {
+      try {
+        await releaseWakeLock();
+        wakeLockAcquired = false;
+        log('Wake lock released after end sound');
+      } catch (e) {
+        log('Error releasing wake lock:', e.message);
+      }
+    }, 15000);
   }
   
   const notesEnabled = get('settings.notes') !== false;
