@@ -78,12 +78,16 @@ function getChartColors() {
 
 function buildEmptyChart(svgW, H, LH, TOPH, colors) {
   const W = 7, BW = 28, GAP = 8;
+  const locale = { pl: 'pl-PL', ko: 'ko-KR', en: 'en-GB' }[getCurrentLang()] || 'en-GB';
+  
   let bars = '';
   for (let i = 0; i < 7; i++) {
     const x = i * (BW + GAP);
     const labelDate = new Date(2024, 0, 1);
     labelDate.setDate(labelDate.getDate() + i);
-    const label = labelDate.toLocaleDateString('en-GB', { weekday: 'narrow' });
+    // Two-letter weekday format
+    const shortLabel = labelDate.toLocaleDateString(locale, { weekday: 'short' });
+    const label = shortLabel.substring(0, 2);
     
     bars += '<rect x="' + x + '" y="' + (H - 2) + '" width="' + BW +
       '" height="2" rx="1" fill="' + colors.border + '" opacity="0.35"></rect>' +
@@ -159,32 +163,50 @@ export function buildWeekdayAverageChart(sessions) {
   
   const locale = { pl: 'pl-PL', ko: 'ko-KR', en: 'en-GB' }[getCurrentLang()] || 'en-GB';
   
+  // Initialize weekday data: Monday-first (0=Monday, 6=Sunday)
   const weekdayData = [];
+  const uniqueDates = []; // Track unique dates (YYYY-MM-DD) per weekday
+  
   for (let i = 0; i < 7; i++) {
-    weekdayData.push({ total: 0, count: 0, label: '' });
+    weekdayData.push({ total: 0, label: '' });
+    uniqueDates.push(new Set());
   }
   
-  const labelDate = new Date(2024, 0, 1);
+  // Set labels (Monday first) - Two letter format
+  const labelDate = new Date(2024, 0, 1); // Jan 1, 2024 was Monday
   for (let i = 0; i < 7; i++) {
     const d = new Date(labelDate);
     d.setDate(d.getDate() + i);
-    weekdayData[i].label = d.toLocaleDateString(locale, { weekday: 'narrow' });
+    // Use short weekday format and take first 2 characters (e.g., "Mo", "Tu")
+    const shortLabel = d.toLocaleDateString(locale, { weekday: 'short' });
+    weekdayData[i].label = shortLabel.substring(0, 2);
   }
   
   if (!sessions.length) {
     return buildEmptyChart(svgW, H, LH, TOPH, colors);
   }
   
+  // Aggregate data by weekday - track total time and unique days
   sessions.forEach(s => {
     if (!s.completed) return;
     const d = new Date(s.id);
-    const dayIndex = d.getDay();
+    const dayIndex = d.getDay(); // 0=Sunday, 1=Monday...
+    // Convert to Monday-first: Monday=0, Sunday=6
     const mondayFirst = (dayIndex + 6) % 7;
     weekdayData[mondayFirst].total += s.actual;
-    weekdayData[mondayFirst].count++;
+    
+    // Track unique date string (YYYY-MM-DD)
+    const dateStr = d.getFullYear() + '-' + 
+                   String(d.getMonth() + 1).padStart(2, '0') + '-' + 
+                   String(d.getDate()).padStart(2, '0');
+    uniqueDates[mondayFirst].add(dateStr);
   });
   
-  const avgMins = weekdayData.map(d => d.count > 0 ? Math.round(d.total / d.count / 60) : 0);
+  // Calculate average total meditation time per day (not per session)
+  const avgMins = weekdayData.map((d, i) => {
+    const uniqueDayCount = uniqueDates[i].size;
+    return uniqueDayCount > 0 ? Math.round(d.total / uniqueDayCount / 60) : 0;
+  });
   
   const maxM = Math.max(1, Math.max(...avgMins));
   
@@ -192,12 +214,13 @@ export function buildWeekdayAverageChart(sessions) {
     const bh = mins > 0 ? Math.max(4, Math.round((mins / maxM) * H)) : 2;
     const x = i * (BW + GAP);
     const fill = mins > 0 ? colors.accent : colors.border;
-    const hasData = weekdayData[i].count > 0;
+    const uniqueDayCount = uniqueDates[i].size;
+    const hasData = uniqueDayCount > 0;
     const op = hasData ? '0.85' : '0.35';
 
     const barRect = '<rect x="' + x + '" y="' + (H - bh) + '" width="' + BW +
       '" height="' + bh + '" rx="3" fill="' + fill + '" opacity="' + op + '">' +
-      '<title>' + (hasData ? weekdayData[i].count + ' sessions, avg: ' : 'No data, ') + 
+      '<title>' + (hasData ? uniqueDayCount + ' ' + t('log_days') + ', avg: ' : 'No data, ') + 
       mins + ' min</title></rect>';
 
     const minLabel = mins > 0
