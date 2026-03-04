@@ -426,7 +426,7 @@ nav {
   color: var(--bg);
 }
 
-/* ─── Lotus Figure (Original Animation) ────────────────────────── */
+/* ─── Lotus Figure ────────────────────────── */
 
 .lotus-figure {
   display: none;
@@ -790,8 +790,8 @@ nav {
 }
 
 .field-group {
-  margin-bottom: 12px;  /* Reduced from 20px */
-  padding: 14px;        /* Slightly reduced from 16px */
+  margin-bottom: 8px;  
+  padding: 8px;       
   background: var(--surface);
   border-radius: var(--radius);
   transition: background 0.3s;
@@ -814,7 +814,7 @@ nav {
 .field-group input,
 .field-group select {
   width: 100%;
-  padding: 12px 14px;  /* Slightly more compact */
+  padding: 12px 14px; 
   border: 1px solid var(--border);
   border-radius: 8px;
   background: var(--surface);
@@ -826,7 +826,7 @@ nav {
   transition: all 0.2s ease;
   outline: none;
   box-shadow: inset 0 1px 3px rgba(0, 0, 0, 0.05);
-  caret-color: var(--accent);  /* Matches theme color */
+  caret-color: var(--accent);  
 }
 
 [data-theme="light"] .field-group input,
@@ -834,7 +834,7 @@ nav {
   background: rgba(255, 255, 255, 0.8);
   border-color: rgba(139, 111, 74, 0.2);
   box-shadow: inset 0 1px 3px rgba(139, 111, 74, 0.05);
-  color: var(--text);  /* Ensures text matches theme */
+  color: var(--text); 
 }
 
 .field-group input:focus,
