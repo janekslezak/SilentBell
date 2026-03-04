@@ -62,4 +62,4 @@ I'd be happy to hear from you with feedback and bug reports.
 
 ---
 
-*Available on & powered by [Netlify](https://jwaseon.netlify.app/)*
+Available on & powered by [Netlify](https://jwaseon.netlify.app/)*
