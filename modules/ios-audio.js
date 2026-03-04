@@ -1,11 +1,12 @@
 // ─── iOS Audio Module ─────────────────────────────────────────────
+// Safari iOS compatible audio - prime all sounds during unlock.
+
 const DEBUG = true;
 function log(...args) {
   if (DEBUG) console.log('[iOS Audio]', ...args);
 }
 
-const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent) || 
-  (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent) && !window.MSStream;
 
 const SOUNDS = {
   'bell': {
@@ -28,130 +29,220 @@ const SOUNDS = {
   }
 };
 
-// ✅ FIXED: Define audioElements BEFORE functions use it
+// Persistent audio elements
 const audioElements = {};
-let isPriming = false;
 let isUnlocked = false;
-let primeTimeout;
 
+// Initialize audio elements immediately
 function initAudioElements() {
   if (!isIOS) return;
   
   log('Initializing audio elements...');
   
   Object.keys(SOUNDS).forEach(type => {
-    if (!audioElements[type]) {
-      audioElements[type] = {};
-    }
+    audioElements[type] = {};
     ['start', 'interval', 'end'].forEach(key => {
-      if (!audioElements[type][key]) {
-        const audio = new Audio();
-        audio.src = SOUNDS[type][key];
-        audio.preload = 'auto';
-        audio.volume = 0;
-        audio.muted = true;
-        audioElements[type][key] = audio;
-      }
+      const audio = new Audio();
+      audio.src = SOUNDS[type][key];
+      audio.preload = 'auto';
+      audioElements[type][key] = audio;
     });
   });
 }
 
-// Helper to safely prime a single audio element
-async function primeSingleAudio(audio, targetVolume = 1.0) {
-  if (!audio) return;
+// Prime all sounds for a type (unlock them during user gesture)
+export function primeAudio(soundType) {
+  if (!isIOS) return;
+  
+  const type = soundType || 'bell';
+  log('Priming audio for:', type);
   
   try {
-    audio.pause();
-    audio.currentTime = 0;
-    audio.muted = true;
-    audio.volume = 0;
-    
-    await audio.play();
-    
-    // Use a Promise instead of setTimeout for better control
-    await new Promise(resolve => {
-      primeTimeout = setTimeout(() => {
-        audio.pause();
-        audio.currentTime = 0;
-        audio.muted = false;
-        audio.volume = targetVolume;
-        resolve();
-      }, 100);
-    });
-  } catch (e) {
-    log('Prime error:', e.message);
-    audio.muted = false;
-    audio.volume = targetVolume;
-    throw e;
-  }
-}
-
-export async function primeAudio(soundType = 'bell') {
-  if (!isIOS || isUnlocked) {
-    log('Audio already unlocked or not iOS');
-    return;
-  }
-  
-  if (isPriming) {
-    log('Already priming, waiting...');
-    // Wait for current priming to finish
-    while (isPriming) {
-      await new Promise(resolve => setTimeout(resolve, 50));
-    }
-    return;
-  }
-  
-  isPriming = true;
-  log('Priming audio for:', soundType);
-  
-  try {
-    const type = soundType;
-    if (!audioElements[type]) {
-      initAudioElements();
+    // Prime START sound - use muted=true for truly silent priming
+    const startAudio = audioElements[type]?.start;
+    if (startAudio) {
+      startAudio.muted = true;  // Mute first
+      startAudio.volume = 0;    // Also set volume to 0
+      startAudio.currentTime = 0;
+      
+      const playPromise = startAudio.play();
+      if (playPromise !== undefined) {
+        playPromise.then(() => {
+          startAudio.pause();
+          startAudio.currentTime = 0;
+          startAudio.muted = false;  // Unmute after pause
+          startAudio.volume = 1;     // Restore volume
+          log('Start sound primed');
+        }).catch(e => {
+          log('Start prime error:', e.message);
+          // Ensure unmuted even on error
+          startAudio.muted = false;
+          startAudio.volume = 1;
+        });
+      }
     }
     
-    // Prime all sounds in parallel
-    await Promise.all([
-      primeSingleAudio(audioElements[type]?.start, 1.0),
-      primeSingleAudio(audioElements[type]?.end, 1.0),
-      primeSingleAudio(audioElements[type]?.interval, 0.8)
-    ]);
+    // Prime END sound (critical!) - also muted
+    const endAudio = audioElements[type]?.end;
+    if (endAudio) {
+      endAudio.muted = true;
+      endAudio.volume = 0;
+      endAudio.currentTime = 0;
+      
+      const playPromise = endAudio.play();
+      if (playPromise !== undefined) {
+        playPromise.then(() => {
+          endAudio.pause();
+          endAudio.currentTime = 0;
+          endAudio.muted = false;
+          endAudio.volume = 1;
+          log('End sound primed');
+        }).catch(e => {
+          log('End prime error:', e.message);
+          endAudio.muted = false;
+          endAudio.volume = 1;
+        });
+      }
+    }
+    
+    // Prime INTERVAL sound - also muted
+    const intervalAudio = audioElements[type]?.interval;
+    if (intervalAudio) {
+      intervalAudio.muted = true;
+      intervalAudio.volume = 0;
+      intervalAudio.currentTime = 0;
+      
+      const playPromise = intervalAudio.play();
+      if (playPromise !== undefined) {
+        playPromise.then(() => {
+          intervalAudio.pause();
+          intervalAudio.currentTime = 0;
+          intervalAudio.muted = false;
+          intervalAudio.volume = 0.8;  // Interval is quieter
+          log('Interval sound primed');
+        }).catch(e => {
+          log('Interval prime error:', e.message);
+          intervalAudio.muted = false;
+          intervalAudio.volume = 0.8;
+        });
+      }
+    }
     
     isUnlocked = true;
-    log('All sounds primed successfully');
   } catch (e) {
-    log('Prime failed:', e.message);
-  } finally {
-    isPriming = false;
-    if (primeTimeout) clearTimeout(primeTimeout);
+    log('Prime exception:', e.message);
   }
 }
 
-export async function play(soundType = 'bell', phase = 'interval') {
-  if (!isIOS) {
-    // Non-iOS implementation here
-    return;
-  }
+export async function playStartSound(soundType) {
+  if (!isIOS) return false;
+  if (soundType === 'none') return true;
   
-  if (!isUnlocked) {
-    log('Audio not primed yet!');
-    return;
-  }
+  const type = soundType || 'bell';
+  log('playStartSound:', type);
   
-  const audio = audioElements[soundType]?.[phase];
-  if (!audio) {
-    log('Sound not found:', soundType, phase);
-    return;
-  }
+  const audio = audioElements[type]?.start;
+  if (!audio) return false;
   
   try {
     audio.currentTime = 0;
+    audio.muted = false;  // Ensure not muted
+    audio.volume = 1.0;
     await audio.play();
-    log('Playing:', soundType, phase);
-  } catch (e) {
-    log('Play error:', e.message);
+    return true;
+  } catch (error) {
+    log('Start sound failed:', error.message);
+    return false;
   }
 }
+
+export async function playIntervalSound(soundType) {
+  if (!isIOS) return false;
+  if (soundType === 'none') return true;
+  
+  const type = soundType || 'bell';
+  const audio = audioElements[type]?.interval;
+  if (!audio) return false;
+  
+  try {
+    audio.currentTime = 0;
+    audio.muted = false;
+    audio.volume = 0.8;
+    await audio.play();
+    return true;
+  } catch (error) {
+    log('Interval sound failed:', error.message);
+    return false;
+  }
+}
+
+export async function playEndSound(soundType) {
+  if (!isIOS) return false;
+  if (soundType === 'none') return true;
+  
+  const type = soundType || 'bell';
+  log('playEndSound:', type);
+  
+  const audio = audioElements[type]?.end;
+  if (!audio) return false;
+  
+  try {
+    audio.currentTime = 0;
+    audio.muted = false;  // Ensure not muted
+    audio.volume = 1.0;
+    await audio.play();
+    log('End sound playing');
+    return true;
+  } catch (error) {
+    log('End sound failed:', error.message);
+    return false;
+  }
+}
+
+export async function playSingleSound(soundType) {
+  if (!isIOS) return false;
+  if (soundType === 'none') return true;
+  
+  const type = soundType || 'bell';
+  const src = SOUNDS[type]?.test || SOUNDS['bell'].test;
+  
+  log('playSingleSound:', type);
+  
+  try {
+    const audio = new Audio(src);
+    audio.muted = false;
+    audio.volume = 1.0;
+    await audio.play();
+    return true;
+  } catch (error) {
+    log('Single sound failed:', error.message);
+    return false;
+  }
+}
+
+// Legacy compatibility
+export function playSilentUnlock() {}
+
+export async function startIOSSession() { return true; }
+export function stopIOSSession() {
+  Object.keys(audioElements).forEach(type => {
+    ['start', 'interval', 'end'].forEach(key => {
+      const audio = audioElements[type]?.[key];
+      if (audio) {
+        audio.pause();
+        audio.currentTime = 0;
+        // Reset muted state
+        audio.muted = false;
+      }
+    });
+  });
+}
+export function stopAllAudio() {
+  stopIOSSession();
+}
+export function isIOSSessionActive() { return isUnlocked; }
 
 // Initialize on load
 initAudioElements();
+
+log('iOS Audio module loaded, isIOS:', isIOS);
