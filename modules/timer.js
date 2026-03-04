@@ -6,14 +6,13 @@ import {
   playStartSound, 
   playIntervalSound, 
   playEndSound,
-  stopAllAudio,
-  startIOSSession,
-  stopIOSSession
+  stopAllAudio
 } from './audio.js';
 import { startSilentLoop, stopSilentLoop } from './silent-loop.js';
 import { saveSession, showNoteField } from './log.js';
-import { state, set, get } from './state.js';
+import { state, get, set } from './state.js';
 import { acquireWakeLock, releaseWakeLock } from './wakelock.js';
+import { IS_IOS, IS_ANDROID, TIMING, DEBUG } from './config.js';
 
 let timerInterval = null;
 let countdownInterval = null;
@@ -24,10 +23,6 @@ let intervalBellMs = 0;
 let nextIntervalAt = null;
 let wakeLockAcquired = false;
 
-const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent) && !window.MSStream;
-const isAndroid = /Android/.test(navigator.userAgent);
-
-const DEBUG = true;
 function log(...args) {
   if (DEBUG) console.log('[Timer]', ...args);
 }
@@ -171,7 +166,7 @@ export async function startSession(displayEl, statusEl, btnStart, btnStop, inter
   
   log('Starting session, duration:', plannedDuration, 'sound:', sound);
   
-  if (!isIOS) {
+  if (!IS_IOS) {
     startSilentLoop();
   } else {
     // For iOS, restart silent loop to ensure it continues
@@ -179,7 +174,7 @@ export async function startSession(displayEl, statusEl, btnStart, btnStop, inter
     startSilentLoop();
   }
   
-  // Acquire wake lock (critical for screen-off)
+  // Acquire wake lock
   try {
     const method = await acquireWakeLock();
     wakeLockAcquired = true;
@@ -251,25 +246,18 @@ async function completeSession(displayEl, statusEl, btnStart, btnStop, currentSo
     log('End sound error:', error.message);
   }
   
-  // Different cleanup timing for iOS vs Android
-  // iOS: 12s is enough (sound is ~13s, iOS handles fade well)
-  // Android: 20s to ensure fade-out completes before screen locks
-  const cleanupDelay = isIOS ? 12000 : 20000;
+  // Use CONFIG for cleanup delays
+  const cleanupDelay = IS_IOS ? TIMING.AUDIO_CLEANUP.IOS : TIMING.AUDIO_CLEANUP.ANDROID;
+  const wakeLockDelay = IS_IOS ? TIMING.WAKE_LOCK_RELEASE.IOS : TIMING.WAKE_LOCK_RELEASE.ANDROID;
   
   log('Scheduling cleanup in', cleanupDelay, 'ms');
   
   // Wait for end sound to finish naturally before cleaning up audio
   setTimeout(() => {
     stopSilentLoop();
-    stopIOSSession();
-    // Only stop audio after the fade has completed
     stopAllAudio();
     log('Audio cleanup completed');
   }, cleanupDelay);
-  
-  // Release wake lock sooner than audio cleanup on Android to avoid issues,
-  // but keep it long enough to prevent screen locking during the sound
-  const wakeLockDelay = isIOS ? 10000 : 18000;
   
   if (wakeLockAcquired) {
     setTimeout(async () => {
@@ -313,7 +301,6 @@ export function stopSession(displayEl, statusEl, btnStart, btnStop) {
     }
     
     stopSilentLoop();
-    stopIOSSession();
     stopAllAudio();
     
     if (statusEl) statusEl.textContent = t('status_ready');
@@ -339,7 +326,6 @@ export function stopSession(displayEl, statusEl, btnStart, btnStop) {
   }
   
   stopSilentLoop();
-  stopIOSSession();
   stopAllAudio();
   
   const actual = Math.round((Date.now() - sessionStart) / 1000);

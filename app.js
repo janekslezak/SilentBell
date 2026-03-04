@@ -1,6 +1,6 @@
 // ─── Silent Bell - Main Application Entry Point ──────────────────
 
-import { t, initI18n, setLang, getCurrentLang } from './modules/i18n.js';
+import { t, initI18n, getCurrentLang, setLang } from './modules/i18n.js';
 import { unlockAudio } from './modules/audio-context.js';
 import { 
   playSingleSound, 
@@ -19,9 +19,10 @@ import {
   setSessionStart, setPlannedDuration, setCurrentSoundForLog
 } from './modules/log.js';
 import { initSettingsRefs, loadSettings, setupSettingsListeners } from './modules/settings.js';
-import { loadFromStorage, saveToStorage } from './modules/state.js';
+import { state, loadFromStorage, saveToStorage } from './modules/state.js';
 import { createDragHandler } from './modules/debounced-drag.js';
-import { setupVisibilityHandler, getWakeLockInfo } from './modules/wakelock.js';
+import { setupVisibilityHandler } from './modules/wakelock.js';
+import { IS_IOS, IS_ANDROID, IS_STANDALONE, TIMING, DEBUG } from './modules/config.js';
 
 const display = document.getElementById('display');
 const statusEl = document.getElementById('status');
@@ -30,30 +31,39 @@ const btnStop = document.getElementById('btn-stop');
 const intervalSelect = document.getElementById('interval-select');
 const displayWrap = document.getElementById('display-wrap');
 
-const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent) && !window.MSStream;
-const isStandalone = window.navigator.standalone === true || window.matchMedia('(display-mode: standalone)').matches;
-
-// Use NoSleep.min.js from global scope (loaded via script tag in index.html)
+// NoSleep reference
 const NoSleep = window.NoSleep;
 let noSleep = null;
 
-const DEBUG = true;
 function log(...args) {
   if (DEBUG) console.log('[App]', ...args);
 }
 
-function showIOSLoadingScreen() {
+// ─── Loading Screen (iOS & Android) ─────────────────────────────
+
+function showLoadingScreen() {
   const loadingScreen = document.getElementById('ios-loading-screen');
-  if (loadingScreen && isIOS && isStandalone) {
+  if (loadingScreen && IS_STANDALONE) {
     loadingScreen.style.display = 'flex';
+    log('Showing loading screen');
+    
     setTimeout(() => {
-      loadingScreen.classList.add('hidden');
-      setTimeout(() => {
-        loadingScreen.style.display = 'none';
-      }, 500);
-    }, 1500);
+      hideLoadingScreen();
+    }, TIMING.LOADING_SCREEN);
   }
 }
+
+function hideLoadingScreen() {
+  const loadingScreen = document.getElementById('ios-loading-screen');
+  if (loadingScreen) {
+    loadingScreen.classList.add('hidden');
+    setTimeout(() => {
+      loadingScreen.style.display = 'none';
+    }, 500);
+  }
+}
+
+// ─── Service Worker ─────────────────────────────────────────────
 
 if ('serviceWorker' in navigator) {
   window.addEventListener('load', () => {
@@ -67,15 +77,21 @@ if ('serviceWorker' in navigator) {
   });
 }
 
+// ─── Navigation ─────────────────────────────────────────────────
+
 document.querySelectorAll('.nav-btn').forEach(btn => {
   btn.addEventListener('click', () => {
     document.querySelectorAll('.nav-btn').forEach(b => b.classList.remove('active'));
     document.querySelectorAll('.view').forEach(v => v.classList.remove('active'));
     btn.classList.add('active');
-    document.getElementById(`view-${btn.dataset.view}`).classList.add('active');
+    const viewId = `view-${btn.dataset.view}`;
+    const viewEl = document.getElementById(viewId);
+    if (viewEl) viewEl.classList.add('active');
     if (btn.dataset.view === 'log') renderLog();
   });
 });
+
+// ─── Drag Handler ───────────────────────────────────────────────
 
 let dragHandler = null;
 
@@ -105,19 +121,29 @@ function initDragHandler() {
   });
 }
 
-document.getElementById('display-up')?.addEventListener('click', (e) => {
-  if (!changeTime(0)) return;
-  const delta = e.shiftKey ? 1 : 60;
-  setTime(getTotalSeconds() + delta, display);
-  saveToStorage();
-});
+// Arrow buttons
+const displayUp = document.getElementById('display-up');
+const displayDown = document.getElementById('display-down');
 
-document.getElementById('display-down')?.addEventListener('click', (e) => {
-  if (!changeTime(0)) return;
-  const delta = e.shiftKey ? 1 : 60;
-  setTime(getTotalSeconds() - delta, display);
-  saveToStorage();
-});
+if (displayUp) {
+  displayUp.addEventListener('click', (e) => {
+    if (!changeTime(0)) return;
+    const delta = e.shiftKey ? 1 : 60;
+    setTime(getTotalSeconds() + delta, display);
+    saveToStorage();
+  });
+}
+
+if (displayDown) {
+  displayDown.addEventListener('click', (e) => {
+    if (!changeTime(0)) return;
+    const delta = e.shiftKey ? 1 : 60;
+    setTime(getTotalSeconds() - delta, display);
+    saveToStorage();
+  });
+}
+
+// ─── Start / Stop Session ───────────────────────────────────────
 
 const originalStartText = btnStart?.textContent || 'Start';
 let isStarting = false;
@@ -142,9 +168,16 @@ async function processStart(currentSound) {
   try {
     isStarting = true;
     setStartButtonLoading(true);
-    statusEl.textContent = t('status_preparing') || 'Preparing...';
+    if (statusEl) statusEl.textContent = t('status_preparing') || 'Preparing...';
     
     startSilentLoop();
+    
+    if (!noSleep && NoSleep) {
+      noSleep = new NoSleep();
+    }
+    if (noSleep) {
+      await noSleep.enable();
+    }
     
     const timerState = getTimerState();
     setSessionStart(Date.now());
@@ -159,17 +192,17 @@ async function processStart(currentSound) {
   } catch (error) {
     log('Start error:', error);
     setStartButtonLoading(false);
-    statusEl.textContent = t('status_error') || 'Error';
+    if (statusEl) statusEl.textContent = t('status_error') || 'Error';
   }
 }
 
-// iOS handler: Enable NoSleep.min.js synchronously during user gesture
+// iOS-specific start handler with audio priming fix
 function handleIOSStart(e) {
-  if (isStarting || btnStart.disabled) return;
+  if (isStarting || !btnStart || btnStart.disabled) return;
   
-  log('iOS Start: Enabling NoSleep.min.js');
+  log('iOS Start: Priming audio');
   
-  // CRITICAL: Create and enable NoSleep synchronously during user gesture
+  // Enable NoSleep synchronously
   if (!noSleep && NoSleep) {
     noSleep = new NoSleep();
   }
@@ -178,17 +211,22 @@ function handleIOSStart(e) {
   }
   
   const currentSound = document.getElementById('settings-sound')?.value || 'bell';
-  primeAudio(currentSound);
+  
+  // CRITICAL FIX: Prime audio immediately during user gesture
+  // This prevents loud audible playback during countdown on first use
+  if (typeof primeAudio === 'function') {
+    primeAudio(currentSound);
+  }
+  
   processStart(currentSound);
 }
 
-// Standard handler
+// Standard start handler
 async function handleStandardStart() {
-  if (isStarting || btnStart.disabled) return;
+  if (isStarting || !btnStart || btnStart.disabled) return;
   
-  log('Standard start: Enabling NoSleep.min.js');
+  log('Standard start');
   
-  // Enable NoSleep for all platforms
   if (!noSleep && NoSleep) {
     noSleep = new NoSleep();
   }
@@ -201,12 +239,17 @@ async function handleStandardStart() {
   await unlockAudio();
   startSilentLoop();
   
+  // Prime audio for non-iOS as well to ensure consistency
+  if (typeof primeAudio === 'function') {
+    primeAudio(currentSound);
+  }
+  
   processStart(currentSound);
 }
 
-// Attach handlers
+// Attach start handlers
 if (btnStart) {
-  if (isIOS) {
+  if (IS_IOS) {
     btnStart.addEventListener('touchstart', handleIOSStart, { passive: false });
     btnStart.addEventListener('click', handleIOSStart);
   } else {
@@ -214,142 +257,174 @@ if (btnStart) {
   }
 }
 
-btnStop?.addEventListener('click', () => {
-  try {
-    log('Stop button clicked');
+// Stop handler
+if (btnStop) {
+  btnStop.addEventListener('click', () => {
+    try {
+      log('Stop button clicked');
+      
+      if (noSleep) {
+        noSleep.disable();
+      }
+      
+      stopSession(display, statusEl, btnStart, btnStop);
+    } catch (error) {
+      log('Error stopping session:', error);
+      if (btnStart) {
+        btnStart.disabled = false;
+        btnStart.textContent = originalStartText;
+      }
+      if (btnStop) btnStop.disabled = true;
+      if (statusEl) statusEl.textContent = t('status_ready');
+      if (display) display.textContent = formatTime(getTotalSeconds());
+    }
+  });
+}
+
+// ─── CSV & Manual Entry ─────────────────────────────────────────
+
+const btnExport = document.getElementById('btn-export');
+if (btnExport) {
+  btnExport.addEventListener('click', exportCSV);
+}
+
+const btnImportCsv = document.getElementById('btn-import-csv');
+const importCsvFile = document.getElementById('import-csv-file');
+
+if (btnImportCsv && importCsvFile) {
+  btnImportCsv.addEventListener('click', () => {
+    importCsvFile.click();
+  });
+  
+  importCsvFile.addEventListener('change', (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
     
-    // Disable NoSleep.min.js when stopping
-    if (noSleep) {
-      noSleep.disable();
+    importCSV(file, 
+      (count) => {
+        alert(t('import_success')?.replace('{count}', count) || `Imported ${count} sessions from CSV.`);
+      },
+      (err) => {
+        alert((t('import_error') || 'Could not import CSV: ') + err);
+      }
+    );
+    
+    e.target.value = '';
+  });
+}
+
+const btnManualLog = document.getElementById('btn-manual-log');
+if (btnManualLog) {
+  btnManualLog.addEventListener('click', () => {
+    const form = document.getElementById('manual-entry');
+    if (!form) return;
+    
+    const visible = form.style.display === 'flex';
+    
+    if (visible) {
+      form.style.display = 'none';
+    } else {
+      const now = new Date();
+      const pad = (n) => String(n).padStart(2, '0');
+      
+      const dateInput = document.getElementById('manual-date');
+      const timeInput = document.getElementById('manual-time');
+      const durationInput = document.getElementById('manual-duration');
+      const noteInput = document.getElementById('manual-note');
+      
+      if (dateInput) {
+        dateInput.value = `${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(now.getDate())}`;
+      }
+      if (timeInput) {
+        timeInput.value = `${pad(now.getHours())}:${pad(now.getMinutes())}`;
+      }
+      if (durationInput) durationInput.value = '';
+      if (noteInput) {
+        noteInput.value = '';
+        noteInput.placeholder = t('note_placeholder');
+      }
+      
+      form.style.display = 'flex';
+    }
+  });
+}
+
+const manualCancelBtn = document.getElementById('manual-cancel-btn');
+if (manualCancelBtn) {
+  manualCancelBtn.addEventListener('click', () => {
+    const form = document.getElementById('manual-entry');
+    if (form) form.style.display = 'none';
+  });
+}
+
+const manualSaveBtn = document.getElementById('manual-save-btn');
+if (manualSaveBtn) {
+  manualSaveBtn.addEventListener('click', () => {
+    const dateVal = document.getElementById('manual-date')?.value;
+    const timeVal = document.getElementById('manual-time')?.value;
+    const durVal = parseInt(document.getElementById('manual-duration')?.value);
+    const noteVal = document.getElementById('manual-note')?.value.trim();
+    
+    if (!durVal || durVal < 1) {
+      alert(t('manual_err_dur'));
+      return;
     }
     
-    stopSession(display, statusEl, btnStart, btnStop);
-  } catch (error) {
-    log('Error stopping session:', error);
-    btnStart.disabled = false;
-    btnStart.textContent = originalStartText;
-    btnStop.disabled = true;
-    statusEl.textContent = t('status_ready');
-    display.textContent = formatTime(getTotalSeconds());
-  }
-});
-
-document.getElementById('btn-export')?.addEventListener('click', exportCSV);
-
-document.getElementById('btn-import-csv')?.addEventListener('click', () => {
-  document.getElementById('import-csv-file')?.click();
-});
-
-document.getElementById('import-csv-file')?.addEventListener('change', (e) => {
-  const file = e.target.files[0];
-  if (!file) return;
-  
-  importCSV(file, 
-    (count) => {
-      alert(t('import_success')?.replace('{count}', count) || `Imported ${count} sessions from CSV.`);
-    },
-    (err) => {
-      alert((t('import_error') || 'Could not import CSV: ') + err);
-    }
-  );
-  
-  e.target.value = '';
-});
-
-document.getElementById('btn-manual-log')?.addEventListener('click', () => {
-  const form = document.getElementById('manual-entry');
-  if (!form) return;
-  
-  const visible = form.style.display === 'flex';
-  
-  if (visible) {
-    form.style.display = 'none';
-  } else {
-    const now = new Date();
-    const pad = (n) => String(n).padStart(2, '0');
-    
-    const dateInput = document.getElementById('manual-date');
-    const timeInput = document.getElementById('manual-time');
-    const durationInput = document.getElementById('manual-duration');
-    const noteInput = document.getElementById('manual-note');
-    
-    if (dateInput) {
-      dateInput.value = `${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(now.getDate())}`;
-    }
-    if (timeInput) {
-      timeInput.value = `${pad(now.getHours())}:${pad(now.getMinutes())}`;
-    }
-    if (durationInput) {
-      durationInput.value = '';
-    }
-    if (noteInput) {
-      noteInput.value = '';
-      noteInput.placeholder = t('note_placeholder');
+    let finalDate = dateVal;
+    if (!finalDate) {
+      const now = new Date();
+      const pad = (n) => String(n).padStart(2, '0');
+      finalDate = `${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(now.getDate())}`;
     }
     
-    form.style.display = 'flex';
-  }
-});
-
-document.getElementById('manual-cancel-btn')?.addEventListener('click', () => {
-  const form = document.getElementById('manual-entry');
-  if (form) form.style.display = 'none';
-});
-
-document.getElementById('manual-save-btn')?.addEventListener('click', () => {
-  const dateVal = document.getElementById('manual-date')?.value;
-  const timeVal = document.getElementById('manual-time')?.value;
-  const durVal = parseInt(document.getElementById('manual-duration')?.value);
-  const noteVal = document.getElementById('manual-note')?.value.trim();
-  
-  if (!durVal || durVal < 1) {
-    alert(t('manual_err_dur'));
-    return;
-  }
-  
-  let finalDate = dateVal;
-  if (!finalDate) {
-    const now = new Date();
-    const pad = (n) => String(n).padStart(2, '0');
-    finalDate = `${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(now.getDate())}`;
-  }
-  
-  const finalTime = timeVal || '00:00';
-  
-  saveManualSession(finalDate, finalTime, durVal, noteVal);
-  
-  const form = document.getElementById('manual-entry');
-  if (form) form.style.display = 'none';
-  
-  renderLog();
-  alert(t('manual_saved'));
-});
-
-document.getElementById('btn-clear-log')?.addEventListener('click', () => {
-  if (confirm(t('confirm_clear'))) {
-    clearLog();
+    const finalTime = timeVal || '00:00';
+    
+    saveManualSession(finalDate, finalTime, durVal, noteVal);
+    
+    const form = document.getElementById('manual-entry');
+    if (form) form.style.display = 'none';
+    
     renderLog();
-  }
-});
+    alert(t('manual_saved'));
+  });
+}
 
-document.getElementById('btn-test-sound')?.addEventListener('click', async () => {
-  const type = document.getElementById('settings-sound')?.value;
-  if (!type || type === 'none') return;
-  
-  log('Test sound:', type);
-  
-  try {
-    await playSingleSound(type);
-  } catch (error) {
-    log('Test sound failed:', error);
-  }
-});
+const btnClearLog = document.getElementById('btn-clear-log');
+if (btnClearLog) {
+  btnClearLog.addEventListener('click', () => {
+    if (confirm(t('confirm_clear'))) {
+      clearLog();
+      renderLog();
+    }
+  });
+}
 
-// ─── Language Button ─────────────────────────────────────────────
+const btnTestSound = document.getElementById('btn-test-sound');
+if (btnTestSound) {
+  btnTestSound.addEventListener('click', async () => {
+    const type = document.getElementById('settings-sound')?.value;
+    if (!type || type === 'none') return;
+    
+    log('Test sound:', type);
+    
+    try {
+      await unlockAudio();
+      await playSingleSound(type);
+    } catch (error) {
+      log('Test sound failed:', error);
+    }
+  });
+}
+
+// ─── Language & Theme ───────────────────────────────────────────
+
 const langButton = document.getElementById('btn-lang');
 if (langButton) {
   const languages = ['en', 'pl', 'ko'];
   const langLabels = { en: 'EN', pl: 'PL', ko: 'KO' };
+  
+  // Set initial label
+  langButton.textContent = langLabels[getCurrentLang()] || 'EN';
   
   langButton.addEventListener('click', async () => {
     const currentLang = getCurrentLang();
@@ -359,55 +434,35 @@ if (langButton) {
     
     log('Switching language from', currentLang, 'to', nextLang);
     
-    try {
-      await unlockAudio();
-    } catch (e) {
-      log('Audio unlock on lang switch failed:', e.message);
-    }
+    try { await unlockAudio(); } catch (e) {}
     
     setLang(nextLang);
     langButton.textContent = langLabels[nextLang];
-    
     loadSettings(display);
     
     if (!isTimerRunning() && statusEl) {
       statusEl.textContent = t('status_ready');
     }
   });
-  
-  langButton.textContent = langLabels[getCurrentLang()] || 'EN';
 }
 
-// ─── Theme Button ────────────────────────────────────────────────
 const themeButton = document.getElementById('btn-theme');
 if (themeButton) {
   const getSavedTheme = () => {
-    try {
-      return localStorage.getItem('theme');
-    } catch (e) {
-      return null;
-    }
+    try { return localStorage.getItem('theme'); } catch (e) { return null; }
   };
   
   const getSystemTheme = () => {
     return window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
   };
   
-  const getCurrentTheme = () => {
-    return getSavedTheme() || getSystemTheme();
-  };
+  const getCurrentTheme = () => getSavedTheme() || getSystemTheme();
   
   const setTheme = (theme) => {
     document.documentElement.setAttribute('data-theme', theme);
-    try {
-      localStorage.setItem('theme', theme);
-    } catch (e) {
-      log('Failed to save theme:', e.message);
-    }
+    try { localStorage.setItem('theme', theme); } catch (e) {}
     
-    if (themeButton) {
-      themeButton.textContent = theme === 'dark' ? '☀️' : '🌙';
-    }
+    themeButton.textContent = theme === 'dark' ? '☀️' : '🌙';
     
     const darkMeta = document.querySelector('meta[name="theme-color"][media="(prefers-color-scheme: dark)"]');
     const lightMeta = document.querySelector('meta[name="theme-color"][media="(prefers-color-scheme: light)"]');
@@ -421,35 +476,25 @@ if (themeButton) {
         darkMeta.setAttribute('media', '(prefers-color-scheme: dark)');
       }
     }
-    
-    log('Theme set to:', theme);
   };
   
-  const initialTheme = getCurrentTheme();
-  setTheme(initialTheme);
+  setTheme(getCurrentTheme());
   
   themeButton.addEventListener('click', async () => {
-    const currentTheme = getCurrentTheme();
-    const newTheme = currentTheme === 'dark' ? 'light' : 'dark';
-    
-    log('Switching theme from', currentTheme, 'to', newTheme);
-    
-    try {
-      await unlockAudio();
-    } catch (e) {
-      log('Audio unlock on theme switch failed:', e.message);
-    }
-    
-    setTheme(newTheme);
+    const current = getCurrentTheme();
+    const next = current === 'dark' ? 'light' : 'dark';
+    try { await unlockAudio(); } catch (e) {}
+    setTheme(next);
   });
 }
 
+// ─── iOS Install Banner ─────────────────────────────────────────
+
 (function initIOSBanner() {
   const isIos = /iphone|ipad|ipod/i.test(navigator.userAgent);
-  const isStandalone = window.navigator.standalone === true;
   const dismissed = localStorage.getItem('iosPromptDismissed');
   
-  if (!isIos || isStandalone || dismissed) return;
+  if (!isIos || IS_STANDALONE || dismissed) return;
   
   const banner = document.getElementById('ios-install-banner');
   const text = document.getElementById('ios-install-text');
@@ -460,45 +505,51 @@ if (themeButton) {
   text.textContent = t('ios_install');
   banner.style.display = 'flex';
   
-  close?.addEventListener('click', () => {
-    banner.style.display = 'none';
-    localStorage.setItem('iosPromptDismissed', '1');
-  });
+  if (close) {
+    close.addEventListener('click', () => {
+      banner.style.display = 'none';
+      localStorage.setItem('iosPromptDismissed', '1');
+    });
+  }
 })();
+
+// ─── Keyboard Shortcuts ─────────────────────────────────────────
 
 document.addEventListener('keydown', (e) => {
   if (e.code === 'Space' && !e.target.matches('input, textarea')) {
     e.preventDefault();
     
-    if (!btnStart?.disabled) {
-      btnStart?.click();
-    } else if (!btnStop?.disabled) {
-      btnStop?.click();
+    if (btnStart && !btnStart.disabled) {
+      btnStart.click();
+    } else if (btnStop && !btnStop.disabled) {
+      btnStop.click();
     }
   }
   
   if (e.code === 'Escape' && isTimerRunning()) {
-    btnStop?.click();
+    if (btnStop) btnStop.click();
   }
 });
 
-if (isIOS) {
-  log('iOS detected, setting up handlers');
-  showIOSLoadingScreen();
+// ─── Platform Setup ─────────────────────────────────────────────
+
+if (IS_IOS) {
+  log('iOS detected');
+  if (IS_STANDALONE) showLoadingScreen();
   setupVisibilityHandler();
 }
 
-window.addEventListener('error', (e) => {
-  log('Global error:', e.message);
-});
+if (IS_ANDROID) {
+  log('Android detected');
+  if (IS_STANDALONE) showLoadingScreen();
+  setupVisibilityHandler();
+}
 
-window.addEventListener('unhandledrejection', (e) => {
-  log('Unhandled promise rejection:', e.reason);
-});
+window.addEventListener('error', (e) => log('Global error:', e.message));
+window.addEventListener('unhandledrejection', (e) => log('Unhandled rejection:', e.reason));
 
 if (typeof window !== 'undefined') {
   window.SilentBell = {
-    getWakeLockInfo,
     isTimerRunning,
     saveToStorage,
     loadFromStorage,
@@ -507,11 +558,12 @@ if (typeof window !== 'undefined') {
   };
 }
 
+// ─── Initialization ─────────────────────────────────────────────
+
 function init() {
-  log('Initializing Silent Bell v1.3.1...');
-  log('Platform:', isIOS ? 'iOS' : 'Desktop');
-  log('Standalone:', isStandalone);
-  log('NoSleep.min.js available:', !!NoSleep);
+  log('Initializing Silent Bell...');
+  log('Platform:', IS_IOS ? 'iOS' : IS_ANDROID ? 'Android' : 'Desktop');
+  log('Standalone:', IS_STANDALONE);
   
   initI18n();
   loadFromStorage();
@@ -521,8 +573,8 @@ function init() {
   initDragHandler();
   saveToStorage();
   
-  const defaultSound = 'bell';
-  preloadSoundSet(defaultSound).catch(() => {});
+  // Preload default sound set
+  preloadSoundSet('bell').catch(() => {});
   
   log('Silent Bell initialized');
 }
