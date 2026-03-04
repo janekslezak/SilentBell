@@ -24,7 +24,7 @@ const translations = {
     status_error: 'Error - tap to retry',
     settings_duration: 'Default duration (min)',
     settings_sound: 'Sound',
-    settings_interval: 'Interval bell (min)',
+    settings_interval: 'Interval sound (min)',
     settings_prepare: 'Prepare countdown (sec)',
     settings_notes: 'Session notes',
     notes_on: 'Enabled',
@@ -58,7 +58,7 @@ const translations = {
     ios_install: 'To install: tap Share then "Add to Home Screen"'
   },
   pl: {
-    nav_timer: 'Timer',
+    nav_timer: 'Minutnik',
     nav_log: 'Dziennik',
     nav_settings: 'Ustawienia',
     btn_start: 'Start',
