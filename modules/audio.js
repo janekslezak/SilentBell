@@ -1,7 +1,7 @@
 // ─── Audio Engine Module ─────────────────────────────────────────
 // Unified audio system with iOS-specific handling.
 
-import { 
+import {
   playStartSound as playIOSStart,
   playIntervalSound as playIOSInterval,
   playEndSound as playIOSEnd,
@@ -105,6 +105,9 @@ export async function preloadSoundSet(soundType) {
 async function playStandardAudio(src, volume = 1.0) {
   try {
     const audio = getAudioElement(src);
+    if (!audio) {
+      throw new Error('Audio element not found');
+    }
     audio.volume = volume;
     audio.currentTime = 0;
     await audio.play();
@@ -127,56 +130,94 @@ export async function playStartSound(type) {
   if (type === 'none') return;
   log('playStartSound:', type);
   
-  if (isIOS) {
-    return await playIOSStart(type);
+  try {
+    if (isIOS) {
+      return await playIOSStart(type);
+    }
+    
+    const files = AUDIO_FILES[type] || AUDIO_FILES['bell'];
+    if (!files || !files.start) {
+      throw new Error('Start sound not found for type: ' + type);
+    }
+    return await playStandardAudio(files.start, 1.0);
+  } catch (error) {
+    log('Error in playStartSound:', error.message);
+    return false;
   }
-  
-  const files = AUDIO_FILES[type] || AUDIO_FILES['bell'];
-  await playStandardAudio(files.start, 1.0);
 }
 
 export async function playIntervalSound(type) {
   if (type === 'none') return;
   
-  if (isIOS) {
-    return await playIOSInterval(type);
+  try {
+    if (isIOS) {
+      return await playIOSInterval(type);
+    }
+    
+    const files = AUDIO_FILES[type] || AUDIO_FILES['bell'];
+    if (!files || !files.interval) {
+      throw new Error('Interval sound not found for type: ' + type);
+    }
+    return await playStandardAudio(files.interval, 0.8);
+  } catch (error) {
+    log('Error in playIntervalSound:', error.message);
+    return false;
   }
-  
-  const files = AUDIO_FILES[type] || AUDIO_FILES['bell'];
-  await playStandardAudio(files.interval, 0.8);
 }
 
 export async function playEndSound(type) {
   if (type === 'none') return;
   log('playEndSound:', type);
   
-  if (isIOS) {
-    return await playIOSEnd(type);
+  try {
+    if (isIOS) {
+      return await playIOSEnd(type);
+    }
+    
+    const files = AUDIO_FILES[type] || AUDIO_FILES['bell'];
+    if (!files || !files.end) {
+      throw new Error('End sound not found for type: ' + type);
+    }
+    return await playStandardAudio(files.end, 1.0);
+  } catch (error) {
+    log('Error in playEndSound:', error.message);
+    return false;
   }
-  
-  const files = AUDIO_FILES[type] || AUDIO_FILES['bell'];
-  await playStandardAudio(files.end, 1.0);
 }
 
 export async function playSingleSound(type) {
   if (type === 'none') return;
   
-  if (isIOS) {
-    return await playIOSSingle(type);
+  try {
+    if (isIOS) {
+      return await playIOSSingle(type);
+    }
+    
+    const files = AUDIO_FILES[type] || AUDIO_FILES['bell'];
+    if (!files || !files.single) {
+      throw new Error('Single sound not found for type: ' + type);
+    }
+    return await playStandardAudio(files.single, 1.0);
+  } catch (error) {
+    log('Error in playSingleSound:', error.message);
+    return false;
   }
-  
-  const files = AUDIO_FILES[type] || AUDIO_FILES['bell'];
-  await playStandardAudio(files.single, 1.0);
 }
 
 export function stopAllAudio() {
-  stopIOSAudio();
-  audioCache.forEach(audio => {
-    try {
-      audio.pause();
-      audio.currentTime = 0;
-    } catch (e) {}
-  });
+  try {
+    stopIOSAudio();
+    audioCache.forEach(audio => {
+      try {
+        audio.pause();
+        audio.currentTime = 0;
+      } catch (e) {
+        log('Error stopping audio:', e.message);
+      }
+    });
+  } catch (error) {
+    log('Error in stopAllAudio:', error.message);
+  }
 }
 
 export { startIOSSession, stopIOSSession, isIOSSessionActive };
