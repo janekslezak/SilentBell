@@ -16,7 +16,7 @@
 
 **In Settings:** Adjust default duration, sound, interval bells, preparation countdown, and toggle notes on or off.
 
-&gt; ⚠️ **iOS Important:** Do not manually turn off the screen – it will prevent the sound from ringing at the end of the session.
+> ⚠️ **iOS Important:** Do not manually turn off the screen – it will prevent the sound from ringing at the end of the session.
 
 ---
 
@@ -45,9 +45,57 @@ Once installed, Silent Bell launches like any native app—no browser, no addres
 
 ---
 
+## Setup Instructions
+
+To set up the project locally for development or contribution:
+
+1. Clone the repository:
+   ```bash
+   git clone https://github.com/janekslezak/SilentBell.git
+   ```
+
+2. Navigate to the project directory:
+   ```bash
+   cd SilentBell
+   ```
+
+3. Open the `index.html` file in your preferred browser or use a local development server.
+
+---
+
+## Usage Examples
+
+Here are some examples of how to use Silent Bell:
+
+- **Basic Meditation Session:**
+  1. Open the app.
+  2. Set the duration to 10 minutes.
+  3. Click **Start**.
+  4. Meditate until the timer ends.
+
+- **Advanced Session with Intervals:**
+  1. Open the app.
+  2. Go to Settings and enable interval bells.
+  3. Set the duration to 20 minutes and interval time to 5 minutes.
+  4. Click **Start**.
+  5. Meditate with interval bells every 5 minutes.
+
+---
+
+## Contribution Guidelines
+
+We welcome contributions to the Silent Bell project! To contribute:
+
+1. Fork the repository.
+2. Create a new branch for your feature or bug fix.
+3. Make your changes and test thoroughly.
+4. Submit a pull request with a detailed description of your changes.
+
+---
+
 ## Credits
 
-Uses **NoSleep.min.js** to keep your screen awake during sessions:  
+Uses **NoSleep.min.js** to keep your screen awake during sessions:
 https://github.com/richtr/NoSleep.js/blob/master/dist/NoSleep.min.js
 
 ---
