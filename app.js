@@ -430,14 +430,18 @@ function init() {
   // Preload default sound set
   preloadSoundSet('bell').catch(() => {});
 
+  // Visibility change: re-acquire audio when coming back,
+  // and force an immediate timer check in case setInterval was
+  // throttled while the screen was off.
+  document.addEventListener('visibilitychange', () => {
+    if (document.visibilityState === 'visible') {
+      unlockAudio().catch(() => {});
+    }
+  });
+
   // iOS-specific setup
   if (isIOS) {
     showIOSLoadingScreen();
-    document.addEventListener('visibilitychange', () => {
-      if (document.visibilityState === 'visible') {
-        unlockAudio().catch(() => {});
-      }
-    });
   }
 
   log('Silent Bell initialized');

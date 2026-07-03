@@ -1,4 +1,4 @@
-# Silent Bell v.1.4.1
+# Silent Bell v.1.4.0
 
 **A lightweight meditation timer with built-in log. No accounts. No tracking. No ads.**
 

@@ -1,9 +1,12 @@
 // ─── Timer Module ────────────────────────────────────────────────
-// Meditation timer with high-precision countdown using
-// requestAnimationFrame + timestamp comparison (no setInterval drift).
+// Meditation timer with setInterval-based countdown.
+// Uses wall-clock timestamp comparison for accuracy.
+// setInterval continues to fire (throttled, but alive) when the
+// screen is off on Android — unlike requestAnimationFrame which
+// is completely frozen.
 //
 // Session lifecycle:
-//   startCountdown() → prepare phase → startSession() → RAF tick loop → completeSession()
+//   startCountdown() → prepare phase → startSession() → tick loop → completeSession()
 //                                       ↑                │
 //                                       └──── stopSession() ←──┘
 
@@ -13,17 +16,16 @@ import {
   playIntervalSound,
   playEndSound,
   stopAllAudio,
-  startIOSSession,
   stopIOSSession
 } from './audio.js';
 import { startSilentLoop, stopSilentLoop } from './silent-loop.js';
 import { saveSession, showNoteField } from './log.js';
-import { state, set, get } from './state.js';
+import { set, get } from './state.js';
 import { acquireWakeLock, releaseWakeLock } from './wakelock.js';
 import { dimScreen, restoreScreen } from './screen-dimmer.js';
 import { isIOS } from './platform.js';
 
-let rafId = null;
+let sessionInterval = null;
 let countdownInterval = null;
 let sessionStart = null;
 let endTimestamp = null;
@@ -78,7 +80,7 @@ export function changeTime() {
 }
 
 export function isTimerRunning() {
-  return rafId !== null || countdownInterval !== null;
+  return sessionInterval !== null || countdownInterval !== null;
 }
 
 function setMeditating(active) {
@@ -122,7 +124,9 @@ export function clearCountdown() {
   return false;
 }
 
-// ─── Main Session — RAF-based High Precision Timer ───────────────
+// ─── Main Session — setInterval-based Timer ──────────────────────
+// setInterval fires (throttled) even when screen is off on Android,
+// unlike requestAnimationFrame which freezes completely.
 
 export async function startSession(displayEl, statusEl, btnStart, btnStop, intervalSelectValue, currentSound) {
   intervalBellMs = parseInt(intervalSelectValue, 10) * 60 * 1000 || 0;
@@ -155,12 +159,12 @@ export async function startSession(displayEl, statusEl, btnStart, btnStop, inter
   if (btnStop) btnStop.disabled = false;
 
   setMeditating(true);
-
-  // Dim screen after session begins (if setting enabled)
   dimScreen();
 
-  // Start the RAF loop
-  tick(displayEl, statusEl, btnStart, btnStop, sound);
+  // Start the 1-second tick loop
+  sessionInterval = setInterval(() => {
+    tick(displayEl, statusEl, btnStart, btnStop, sound);
+  }, 1000);
 }
 
 function tick(displayEl, statusEl, btnStart, btnStop, currentSound) {
@@ -184,16 +188,18 @@ function tick(displayEl, statusEl, btnStart, btnStop, currentSound) {
   // Session complete
   if (remaining <= 0) {
     completeSession(displayEl, statusEl, btnStart, btnStop, currentSound);
-    return;
   }
-
-  rafId = requestAnimationFrame(() => tick(displayEl, statusEl, btnStart, btnStop, currentSound));
 }
 
 // ─── Session Completion ──────────────────────────────────────────
 
 async function completeSession(displayEl, statusEl, btnStart, btnStop, currentSound) {
-  rafId = null;
+  // Stop the interval — prevent multiple completions
+  if (sessionInterval) {
+    clearInterval(sessionInterval);
+    sessionInterval = null;
+  }
+
   setMeditating(false);
   restoreScreen();
 
@@ -247,10 +253,10 @@ export function stopSession(displayEl, statusEl, btnStart, btnStop) {
     return { stopped: true, early: false };
   }
 
-  if (!rafId) return { stopped: false };
+  if (!sessionInterval) return { stopped: false };
 
-  cancelAnimationFrame(rafId);
-  rafId = null;
+  clearInterval(sessionInterval);
+  sessionInterval = null;
   setMeditating(false);
   cleanupAfterStop(displayEl, statusEl, btnStart, btnStop, true);
 
