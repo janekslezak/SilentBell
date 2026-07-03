@@ -1,4 +1,4 @@
-# Silent Bell v.1.3.3
+# Silent Bell v.1.4.0
 
 **A lightweight meditation timer with built-in log. No accounts. No tracking. No ads.**
 
@@ -62,4 +62,4 @@ I'd be happy to hear from you with feedback and bug reports.
 
 ---
 
-Available on & powered by [Netlify](https://jwaseon.netlify.app/)
+*Available on & powered by [Netlify](https://jwaseon.netlify.app/)*

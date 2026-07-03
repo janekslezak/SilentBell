@@ -1,4 +1,4 @@
-const CACHE = 'silent-bell-v10';
+const CACHE = 'silent-bell-v20';
 const ASSETS = [
   '/',
   'index.html',
@@ -8,7 +8,23 @@ const ASSETS = [
   'icon-192.png',
   'icon-512.png',
   'NoSleep.min.js',
-  // Audio files for HTML5 Audio playback
+  // Audio (MP3-based, iOS-primed)
+  'modules/audio.js',
+  'modules/ios-audio.js',
+  // Core modules
+  'modules/timer.js',
+  'modules/state.js',
+  'modules/log.js',
+  'modules/settings.js',
+  'modules/i18n.js',
+  // Platform & utilities
+  'modules/platform.js',
+  'modules/wakelock.js',
+  'modules/silent-loop.js',
+  'modules/debounced-drag.js',
+  'modules/storage.js',
+  'modules/screen-dimmer.js',
+  // Audio files
   'sounds/sequence_bell_start.mp3',
   'sounds/sequence_bell_interval.mp3',
   'sounds/sequence_bell_end.mp3',
@@ -22,40 +38,23 @@ const ASSETS = [
   'sounds/temple_bell_standard.mp3',
   'sounds/temple_bell_high.mp3',
   'sounds/singing_bowl_edge.mp3',
-  'sounds/singing_bowl_edge_high.mp3',
-  // Modules
-  'modules/state.js',
-  'modules/storage.js',
-  'modules/wakelock.js',
-  'modules/audio-context.js',
-  'modules/debounced-drag.js',
-  'modules/i18n.js',
-  'modules/audio.js',
-  'modules/silent-loop.js',
-  'modules/timer.js',
-  'modules/log.js',
-  'modules/settings.js'
+  'sounds/singing_bowl_edge_high.mp3'
 ];
 
 self.addEventListener('install', e => {
   e.waitUntil(
     caches.open(CACHE).then(c => {
       return Promise.all(
-        ASSETS.map(url => 
+        ASSETS.map(url =>
           fetch(url, { cache: 'no-cache' })
             .then(response => {
-              if (response.ok) {
-                return c.put(url, response);
-              }
+              if (response.ok) return c.put(url, response);
               console.warn(`Failed to cache: ${url}`);
             })
-            .catch(err => {
-              console.warn(`Error caching ${url}:`, err.message);
-            })
+            .catch(err => { console.warn(`Error caching ${url}:`, err.message); })
         )
       );
-    })
-    .catch(err => console.warn('Cache install failed:', err))
+    }).catch(err => console.warn('Cache install failed:', err))
   );
   self.skipWaiting();
 });
@@ -72,65 +71,28 @@ self.addEventListener('activate', e => {
 self.addEventListener('fetch', e => {
   if (e.request.method !== 'GET') return;
   if (!e.request.url.startsWith(self.location.origin)) return;
-  
+
   const isAudioFile = e.request.url.match(/\.(mp3|wav|ogg|m4a)$/i);
-  
-  if (isAudioFile) {
-    e.respondWith(
-      caches.match(e.request).then(cached => {
-        if (cached) {
-          fetch(e.request).then(response => {
-            if (response.ok && response.type !== 'opaque') {
-              caches.open(CACHE).then(c => c.put(e.request, response));
-            }
-          }).catch(() => {});
-          return cached;
-        }
-        
-        return fetch(e.request).then(res => {
-          if (res.ok && res.type !== 'opaque') {
-            const copy = res.clone();
-            caches.open(CACHE).then(c => c.put(e.request, copy));
-          }
-          return res;
-        }).catch(() => {
-          return new Response('Audio not available offline', { status: 503 });
-        });
-      })
-    );
-    return;
-  }
-  
+
   e.respondWith(
     caches.match(e.request).then(cached => {
-      if (cached) {
-        fetch(e.request).then(response => {
-          if (response.ok && response.type !== 'opaque') {
-            caches.open(CACHE).then(c => c.put(e.request, response));
-          }
-        }).catch(() => {});
-        
-        return cached;
-      }
-      
-      return fetch(e.request).then(res => {
-        if (res.ok && res.type !== 'opaque') {
-          const copy = res.clone();
-          caches.open(CACHE).then(c => c.put(e.request, copy));
+      // Serve cached immediately, update in background
+      const fetchPromise = fetch(e.request).then(response => {
+        if (response.ok && response.type !== 'opaque') {
+          const copy = response.clone();
+          caches.open(CACHE).then(c => c.put(e.request, copy)).catch(() => {});
         }
-        return res;
-      }).catch(() => {
-        if (e.request.mode === 'navigate') {
-          return caches.match('index.html');
-        }
-        return new Response('Offline', { status: 503 });
+        return response;
+      }).catch(() => cached);
+
+      return cached || fetchPromise.catch(() => {
+        if (e.request.mode === 'navigate') return caches.match('index.html');
+        return new Response(isAudioFile ? 'Audio offline' : 'Offline', { status: 503 });
       });
     })
   );
 });
 
 self.addEventListener('message', e => {
-  if (e.data === 'skipWaiting') {
-    self.skipWaiting();
-  }
+  if (e.data === 'skipWaiting') self.skipWaiting();
 });

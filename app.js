@@ -1,28 +1,23 @@
 // ─── Silent Bell - Main Application Entry Point ──────────────────
+// Version 1.4.0 - Improved audio engine, RAF timer, code optimization
 
-import { t, initI18n, getCurrentLang, setLang } from './modules/i18n.js';
-import { unlockAudio } from './modules/audio-context.js';
-import { 
-  playSingleSound, 
-  primeAudio,
-  preloadSoundSet, 
-  stopAllAudio
-} from './modules/audio.js';
-import { startSilentLoop, stopSilentLoop } from './modules/silent-loop.js';
+import { t, initI18n, setLang, getCurrentLang } from './modules/i18n.js';
+import { unlockAudio, preloadSoundSet, stopAllAudio, primeAudio } from './modules/audio.js';
+import { startSilentLoop } from './modules/silent-loop.js';
 import {
   formatTime, getTotalSeconds, setTime, changeTime, isTimerRunning,
-  startCountdown, startSession, stopSession,
-  getTimerState
+  startCountdown, startSession, stopSession, getTimerState
 } from './modules/timer.js';
 import {
   renderLog, exportCSV, importCSV, saveManualSession, clearLog,
   setSessionStart, setPlannedDuration, setCurrentSoundForLog
 } from './modules/log.js';
 import { initSettingsRefs, loadSettings, setupSettingsListeners } from './modules/settings.js';
-import { state, loadFromStorage, saveToStorage } from './modules/state.js';
+import { loadFromStorage, saveToStorage, get as getState } from './modules/state.js';
 import { createDragHandler } from './modules/debounced-drag.js';
-import { setupVisibilityHandler } from './modules/wakelock.js';
-import { IS_IOS, IS_ANDROID, IS_STANDALONE, TIMING, DEBUG } from './modules/config.js';
+import { getWakeLockInfo } from './modules/wakelock.js';
+import { setDimmerEnabled } from './modules/screen-dimmer.js';
+import { isIOS, isStandalone } from './modules/platform.js';
 
 const display = document.getElementById('display');
 const statusEl = document.getElementById('status');
@@ -31,74 +26,39 @@ const btnStop = document.getElementById('btn-stop');
 const intervalSelect = document.getElementById('interval-select');
 const displayWrap = document.getElementById('display-wrap');
 
-// NoSleep reference
 const NoSleep = window.NoSleep;
 let noSleep = null;
 
-function log(...args) {
-  if (DEBUG) console.log('[App]', ...args);
-}
+const DEBUG = false;
+function log(...args) { if (DEBUG) console.log('[App]', ...args); }
 
-// ─── Loading Screen (iOS & Android) ─────────────────────────────
-
-function showLoadingScreen() {
-  const loadingScreen = document.getElementById('ios-loading-screen');
-  if (loadingScreen && IS_STANDALONE) {
-    loadingScreen.style.display = 'flex';
-    log('Showing loading screen');
-    
-    setTimeout(() => {
-      hideLoadingScreen();
-    }, TIMING.LOADING_SCREEN);
-  }
-}
-
-function hideLoadingScreen() {
-  const loadingScreen = document.getElementById('ios-loading-screen');
-  if (loadingScreen) {
-    loadingScreen.classList.add('hidden');
-    setTimeout(() => {
-      loadingScreen.style.display = 'none';
-    }, 500);
-  }
-}
-
-// ─── Service Worker ─────────────────────────────────────────────
+// ─── Service Worker ──────────────────────────────────────────────
 
 if ('serviceWorker' in navigator) {
   window.addEventListener('load', () => {
     navigator.serviceWorker.register('sw.js')
-      .then(registration => {
-        log('SW registered:', registration.scope);
-      })
-      .catch(error => {
-        log('SW registration failed:', error);
-      });
+      .then(reg => { log('SW registered:', reg.scope); })
+      .catch(err => { log('SW registration failed:', err); });
   });
 }
 
-// ─── Navigation ─────────────────────────────────────────────────
+// ─── Navigation ──────────────────────────────────────────────────
 
 document.querySelectorAll('.nav-btn').forEach(btn => {
   btn.addEventListener('click', () => {
     document.querySelectorAll('.nav-btn').forEach(b => b.classList.remove('active'));
     document.querySelectorAll('.view').forEach(v => v.classList.remove('active'));
     btn.classList.add('active');
-    const viewId = `view-${btn.dataset.view}`;
-    const viewEl = document.getElementById(viewId);
-    if (viewEl) viewEl.classList.add('active');
+    document.getElementById(`view-${btn.dataset.view}`).classList.add('active');
     if (btn.dataset.view === 'log') renderLog();
   });
 });
 
-// ─── Drag Handler ───────────────────────────────────────────────
-
-let dragHandler = null;
+// ─── Timer Display Drag Handler ──────────────────────────────────
 
 function initDragHandler() {
   if (!displayWrap) return;
-  
-  dragHandler = createDragHandler(displayWrap, {
+  createDragHandler(displayWrap, {
     pixelsPerUnit: 12,
     minDelta: 2,
     minValue: 60,
@@ -107,50 +67,36 @@ function initDragHandler() {
     smoothingFactor: 0.3,
     hapticFeedback: true,
     visualFeedback: true,
-    
     getValue: () => getTotalSeconds(),
     shouldIgnore: () => isTimerRunning(),
-    
-    onValueChange: (info) => {
-      setTime(info.value, display);
-    },
-    
-    onEnd: () => {
-      saveToStorage();
-    }
+    onValueChange: (info) => { setTime(info.value, display); },
+    onEnd: () => { saveToStorage(); }
   });
 }
 
-// Arrow buttons
-const displayUp = document.getElementById('display-up');
-const displayDown = document.getElementById('display-down');
+// ─── Arrow Button Handlers ───────────────────────────────────────
 
-if (displayUp) {
-  displayUp.addEventListener('click', (e) => {
-    if (!changeTime(0)) return;
-    const delta = e.shiftKey ? 1 : 60;
-    setTime(getTotalSeconds() + delta, display);
-    saveToStorage();
-  });
-}
+document.getElementById('display-up')?.addEventListener('click', (e) => {
+  if (!changeTime()) return;
+  const delta = e.shiftKey ? 1 : 60;
+  setTime(getTotalSeconds() + delta, display);
+  saveToStorage();
+});
 
-if (displayDown) {
-  displayDown.addEventListener('click', (e) => {
-    if (!changeTime(0)) return;
-    const delta = e.shiftKey ? 1 : 60;
-    setTime(getTotalSeconds() - delta, display);
-    saveToStorage();
-  });
-}
+document.getElementById('display-down')?.addEventListener('click', (e) => {
+  if (!changeTime()) return;
+  const delta = e.shiftKey ? 1 : 60;
+  setTime(getTotalSeconds() - delta, display);
+  saveToStorage();
+});
 
-// ─── Start / Stop Session ───────────────────────────────────────
+// ─── Start / Stop ────────────────────────────────────────────────
 
 const originalStartText = btnStart?.textContent || 'Start';
 let isStarting = false;
 
 function setStartButtonLoading(loading) {
   if (!btnStart) return;
-  
   if (loading) {
     isStarting = true;
     btnStart.disabled = true;
@@ -168,88 +114,51 @@ async function processStart(currentSound) {
   try {
     isStarting = true;
     setStartButtonLoading(true);
-    if (statusEl) statusEl.textContent = t('status_preparing') || 'Preparing...';
-    
+    statusEl.textContent = t('status_preparing') || 'Preparing...';
     startSilentLoop();
-    
-    if (!noSleep && NoSleep) {
-      noSleep = new NoSleep();
-    }
-    if (noSleep) {
-      await noSleep.enable();
-    }
-    
-    const timerState = getTimerState();
+
     setSessionStart(Date.now());
     setPlannedDuration(getTotalSeconds());
-    setCurrentSoundForLog(timerState.currentSound);
-    
+    setCurrentSoundForLog(getTimerState().currentSound);
+
     setStartButtonLoading(false);
-    
+
     startCountdown(display, statusEl, btnStart, btnStop, () => {
       startSession(display, statusEl, btnStart, btnStop, intervalSelect?.value, currentSound);
     });
   } catch (error) {
     log('Start error:', error);
     setStartButtonLoading(false);
-    if (statusEl) statusEl.textContent = t('status_error') || 'Error';
+    statusEl.textContent = t('status_error') || 'Error';
   }
 }
 
-// iOS-specific start handler with audio priming fix
+// iOS: enable NoSleep synchronously during user gesture
 function handleIOSStart(e) {
-  if (isStarting || !btnStart || btnStart.disabled) return;
-  
-  log('iOS Start: Priming audio');
-  
-  // Enable NoSleep synchronously
-  if (!noSleep && NoSleep) {
-    noSleep = new NoSleep();
-  }
-  if (noSleep) {
-    noSleep.enable();
-  }
-  
+  if (isStarting || btnStart.disabled) return;
+  log('iOS Start');
+  if (!noSleep && NoSleep) noSleep = new NoSleep();
+  if (noSleep) noSleep.enable();
   const currentSound = document.getElementById('settings-sound')?.value || 'bell';
-  
-  // CRITICAL FIX: Prime audio immediately during user gesture
-  // This prevents loud audible playback during countdown on first use
-  if (typeof primeAudio === 'function') {
-    primeAudio(currentSound);
-  }
-  
+  unlockAudio();
+  primeAudio(currentSound);
   processStart(currentSound);
 }
 
-// Standard start handler
+// Standard handler
 async function handleStandardStart() {
-  if (isStarting || !btnStart || btnStart.disabled) return;
-  
+  if (isStarting || btnStart.disabled) return;
   log('Standard start');
-  
-  if (!noSleep && NoSleep) {
-    noSleep = new NoSleep();
-  }
-  if (noSleep) {
-    await noSleep.enable();
-  }
-  
+  if (!noSleep && NoSleep) noSleep = new NoSleep();
+  if (noSleep) await noSleep.enable();
   const currentSound = document.getElementById('settings-sound')?.value || 'bell';
-  
   await unlockAudio();
   startSilentLoop();
-  
-  // Prime audio for non-iOS as well to ensure consistency
-  if (typeof primeAudio === 'function') {
-    primeAudio(currentSound);
-  }
-  
   processStart(currentSound);
 }
 
-// Attach start handlers
 if (btnStart) {
-  if (IS_IOS) {
+  if (isIOS) {
     btnStart.addEventListener('touchstart', handleIOSStart, { passive: false });
     btnStart.addEventListener('click', handleIOSStart);
   } else {
@@ -257,325 +166,289 @@ if (btnStart) {
   }
 }
 
-// Stop handler
-if (btnStop) {
-  btnStop.addEventListener('click', () => {
-    try {
-      log('Stop button clicked');
-      
-      if (noSleep) {
-        noSleep.disable();
-      }
-      
-      stopSession(display, statusEl, btnStart, btnStop);
-    } catch (error) {
-      log('Error stopping session:', error);
-      if (btnStart) {
-        btnStart.disabled = false;
-        btnStart.textContent = originalStartText;
-      }
-      if (btnStop) btnStop.disabled = true;
-      if (statusEl) statusEl.textContent = t('status_ready');
-      if (display) display.textContent = formatTime(getTotalSeconds());
-    }
-  });
-}
+btnStop?.addEventListener('click', () => {
+  try {
+    log('Stop');
+    if (noSleep) noSleep.disable();
+    stopSession(display, statusEl, btnStart, btnStop);
+  } catch (error) {
+    log('Error stopping:', error);
+    btnStart.disabled = false;
+    btnStart.textContent = originalStartText;
+    btnStop.disabled = true;
+    statusEl.textContent = t('status_ready');
+    display.textContent = formatTime(getTotalSeconds());
+  }
+});
 
-// ─── CSV & Manual Entry ─────────────────────────────────────────
+// ─── Log Actions ─────────────────────────────────────────────────
 
-const btnExport = document.getElementById('btn-export');
-if (btnExport) {
-  btnExport.addEventListener('click', exportCSV);
-}
+document.getElementById('btn-export')?.addEventListener('click', exportCSV);
 
-const btnImportCsv = document.getElementById('btn-import-csv');
-const importCsvFile = document.getElementById('import-csv-file');
+document.getElementById('btn-import-csv')?.addEventListener('click', () => {
+  document.getElementById('import-csv-file')?.click();
+});
 
-if (btnImportCsv && importCsvFile) {
-  btnImportCsv.addEventListener('click', () => {
-    importCsvFile.click();
-  });
-  
-  importCsvFile.addEventListener('change', (e) => {
-    const file = e.target.files[0];
-    if (!file) return;
-    
-    importCSV(file, 
-      (count) => {
-        alert(t('import_success')?.replace('{count}', count) || `Imported ${count} sessions from CSV.`);
-      },
-      (err) => {
-        alert((t('import_error') || 'Could not import CSV: ') + err);
-      }
-    );
-    
-    e.target.value = '';
-  });
-}
+document.getElementById('import-csv-file')?.addEventListener('change', (e) => {
+  const file = e.target.files[0];
+  if (!file) return;
+  importCSV(file,
+    (count) => { alert(t('import_success')?.replace('{count}', count) || `Imported ${count} sessions`); },
+    (err) => { alert((t('import_error') || 'Import error: ') + err); }
+  );
+  e.target.value = '';
+});
 
-const btnManualLog = document.getElementById('btn-manual-log');
-if (btnManualLog) {
-  btnManualLog.addEventListener('click', () => {
-    const form = document.getElementById('manual-entry');
-    if (!form) return;
-    
-    const visible = form.style.display === 'flex';
-    
-    if (visible) {
-      form.style.display = 'none';
-    } else {
-      const now = new Date();
-      const pad = (n) => String(n).padStart(2, '0');
-      
-      const dateInput = document.getElementById('manual-date');
-      const timeInput = document.getElementById('manual-time');
-      const durationInput = document.getElementById('manual-duration');
-      const noteInput = document.getElementById('manual-note');
-      
-      if (dateInput) {
-        dateInput.value = `${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(now.getDate())}`;
-      }
-      if (timeInput) {
-        timeInput.value = `${pad(now.getHours())}:${pad(now.getMinutes())}`;
-      }
-      if (durationInput) durationInput.value = '';
-      if (noteInput) {
-        noteInput.value = '';
-        noteInput.placeholder = t('note_placeholder');
-      }
-      
-      form.style.display = 'flex';
-    }
-  });
-}
+document.getElementById('btn-manual-log')?.addEventListener('click', () => {
+  const form = document.getElementById('manual-entry');
+  if (!form) return;
+  if (form.style.display === 'flex') {
+    form.style.display = 'none';
+    return;
+  }
+  const now = new Date();
+  const pad = (n) => String(n).padStart(2, '0');
+  document.getElementById('manual-date')?.value && (document.getElementById('manual-date').value = `${now.getFullYear()}-${pad(now.getMonth()+1)}-${pad(now.getDate())}`);
+  document.getElementById('manual-time')?.value && (document.getElementById('manual-time').value = `${pad(now.getHours())}:${pad(now.getMinutes())}`);
+  document.getElementById('manual-duration') && (document.getElementById('manual-duration').value = '');
+  document.getElementById('manual-note') && (document.getElementById('manual-note').value = '');
+  form.style.display = 'flex';
+});
 
-const manualCancelBtn = document.getElementById('manual-cancel-btn');
-if (manualCancelBtn) {
-  manualCancelBtn.addEventListener('click', () => {
-    const form = document.getElementById('manual-entry');
-    if (form) form.style.display = 'none';
-  });
-}
+document.getElementById('manual-cancel-btn')?.addEventListener('click', () => {
+  const form = document.getElementById('manual-entry');
+  if (form) form.style.display = 'none';
+});
 
-const manualSaveBtn = document.getElementById('manual-save-btn');
-if (manualSaveBtn) {
-  manualSaveBtn.addEventListener('click', () => {
-    const dateVal = document.getElementById('manual-date')?.value;
-    const timeVal = document.getElementById('manual-time')?.value;
-    const durVal = parseInt(document.getElementById('manual-duration')?.value);
-    const noteVal = document.getElementById('manual-note')?.value.trim();
-    
-    if (!durVal || durVal < 1) {
-      alert(t('manual_err_dur'));
-      return;
-    }
-    
-    let finalDate = dateVal;
-    if (!finalDate) {
-      const now = new Date();
-      const pad = (n) => String(n).padStart(2, '0');
-      finalDate = `${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(now.getDate())}`;
-    }
-    
-    const finalTime = timeVal || '00:00';
-    
-    saveManualSession(finalDate, finalTime, durVal, noteVal);
-    
-    const form = document.getElementById('manual-entry');
-    if (form) form.style.display = 'none';
-    
-    renderLog();
-    alert(t('manual_saved'));
-  });
-}
+document.getElementById('manual-save-btn')?.addEventListener('click', () => {
+  const dateVal = document.getElementById('manual-date')?.value;
+  const timeVal = document.getElementById('manual-time')?.value;
+  const durVal = parseInt(document.getElementById('manual-duration')?.value);
+  const noteVal = document.getElementById('manual-note')?.value.trim();
+  if (!durVal || durVal < 1) { alert(t('manual_err_dur')); return; }
+  const pad = (n) => String(n).padStart(2, '0');
+  const now = new Date();
+  const finalDate = dateVal || `${now.getFullYear()}-${pad(now.getMonth()+1)}-${pad(now.getDate())}`;
+  const finalTime = timeVal || '00:00';
+  saveManualSession(finalDate, finalTime, durVal, noteVal);
+  document.getElementById('manual-entry').style.display = 'none';
+  renderLog();
+  alert(t('manual_saved'));
+});
 
-const btnClearLog = document.getElementById('btn-clear-log');
-if (btnClearLog) {
-  btnClearLog.addEventListener('click', () => {
-    if (confirm(t('confirm_clear'))) {
-      clearLog();
-      renderLog();
-    }
-  });
-}
+document.getElementById('btn-clear-log')?.addEventListener('click', () => {
+  if (confirm(t('confirm_clear'))) { clearLog(); renderLog(); }
+});
 
-const btnTestSound = document.getElementById('btn-test-sound');
-if (btnTestSound) {
-  btnTestSound.addEventListener('click', async () => {
-    const type = document.getElementById('settings-sound')?.value;
-    if (!type || type === 'none') return;
-    
-    log('Test sound:', type);
-    
-    try {
-      await unlockAudio();
-      await playSingleSound(type);
-    } catch (error) {
-      log('Test sound failed:', error);
-    }
-  });
-}
+// ─── Test Sound ──────────────────────────────────────────────────
 
-// ─── Language & Theme ───────────────────────────────────────────
+document.getElementById('btn-test-sound')?.addEventListener('click', async () => {
+  const type = document.getElementById('settings-sound')?.value;
+  if (!type || type === 'none') return;
+  try {
+    await unlockAudio();
+    // Import playSingleSound dynamically to avoid circular deps
+    const { playSingleSound } = await import('./modules/audio.js');
+    await playSingleSound(type);
+  } catch (e) { log('Test sound failed:', e); }
+});
+
+// ─── Language Button ─────────────────────────────────────────────
 
 const langButton = document.getElementById('btn-lang');
 if (langButton) {
   const languages = ['en', 'pl', 'ko'];
   const langLabels = { en: 'EN', pl: 'PL', ko: 'KO' };
-  
-  // Set initial label
-  langButton.textContent = langLabels[getCurrentLang()] || 'EN';
-  
-  langButton.addEventListener('click', async () => {
-    const currentLang = getCurrentLang();
-    const currentIndex = languages.indexOf(currentLang);
-    const nextIndex = (currentIndex + 1) % languages.length;
-    const nextLang = languages[nextIndex];
-    
-    log('Switching language from', currentLang, 'to', nextLang);
-    
-    try { await unlockAudio(); } catch (e) {}
-    
+
+  async function handleLangSwitch() {
+    const current = getCurrentLang();
+    const nextLang = languages[(languages.indexOf(current) + 1) % languages.length];
+    try { await unlockAudio(); } catch {}
     setLang(nextLang);
     langButton.textContent = langLabels[nextLang];
     loadSettings(display);
-    
-    if (!isTimerRunning() && statusEl) {
-      statusEl.textContent = t('status_ready');
-    }
-  });
+    if (!isTimerRunning() && statusEl) statusEl.textContent = t('status_ready');
+  }
+
+  langButton.addEventListener('click', handleLangSwitch);
+  if (isIOS) {
+    langButton.addEventListener('touchstart', handleLangSwitch, { passive: true });
+  }
+  langButton.textContent = langLabels[getCurrentLang()] || 'EN';
 }
+
+// ─── Theme Button ────────────────────────────────────────────────
 
 const themeButton = document.getElementById('btn-theme');
 if (themeButton) {
-  const getSavedTheme = () => {
-    try { return localStorage.getItem('theme'); } catch (e) { return null; }
-  };
-  
-  const getSystemTheme = () => {
-    return window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
-  };
-  
+  const getSavedTheme = () => { try { return localStorage.getItem('theme'); } catch { return null; } };
+  const getSystemTheme = () => window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
   const getCurrentTheme = () => getSavedTheme() || getSystemTheme();
-  
+
   const setTheme = (theme) => {
     document.documentElement.setAttribute('data-theme', theme);
-    try { localStorage.setItem('theme', theme); } catch (e) {}
-    
+    try { localStorage.setItem('theme', theme); } catch {}
     themeButton.textContent = theme === 'dark' ? '☀️' : '🌙';
-    
+
     const darkMeta = document.querySelector('meta[name="theme-color"][media="(prefers-color-scheme: dark)"]');
     const lightMeta = document.querySelector('meta[name="theme-color"][media="(prefers-color-scheme: light)"]');
-    
     if (darkMeta && lightMeta) {
-      if (theme === 'dark') {
-        darkMeta.removeAttribute('media');
-        lightMeta.setAttribute('media', '(prefers-color-scheme: light)');
-      } else {
-        lightMeta.removeAttribute('media');
-        darkMeta.setAttribute('media', '(prefers-color-scheme: dark)');
-      }
+      if (theme === 'dark') { darkMeta.removeAttribute('media'); lightMeta.setAttribute('media', '(prefers-color-scheme: light)'); }
+      else { lightMeta.removeAttribute('media'); darkMeta.setAttribute('media', '(prefers-color-scheme: dark)'); }
     }
   };
-  
+
   setTheme(getCurrentTheme());
-  
-  themeButton.addEventListener('click', async () => {
-    const current = getCurrentTheme();
-    const next = current === 'dark' ? 'light' : 'dark';
-    try { await unlockAudio(); } catch (e) {}
-    setTheme(next);
-  });
+
+  async function handleThemeSwitch() {
+    try { await unlockAudio(); } catch {}
+    setTheme(getCurrentTheme() === 'dark' ? 'light' : 'dark');
+  }
+
+  themeButton.addEventListener('click', handleThemeSwitch);
+  if (isIOS) {
+    themeButton.addEventListener('touchstart', handleThemeSwitch, { passive: true });
+  }
 }
 
-// ─── iOS Install Banner ─────────────────────────────────────────
+// ─── iOS Install Banner ──────────────────────────────────────────
 
 (function initIOSBanner() {
-  const isIos = /iphone|ipad|ipod/i.test(navigator.userAgent);
   const dismissed = localStorage.getItem('iosPromptDismissed');
-  
-  if (!isIos || IS_STANDALONE || dismissed) return;
-  
+  if (!isIOS || isStandalone || dismissed) return;
   const banner = document.getElementById('ios-install-banner');
   const text = document.getElementById('ios-install-text');
   const close = document.getElementById('ios-install-close');
-  
   if (!banner) return;
-  
   text.textContent = t('ios_install');
   banner.style.display = 'flex';
-  
-  if (close) {
-    close.addEventListener('click', () => {
-      banner.style.display = 'none';
-      localStorage.setItem('iosPromptDismissed', '1');
-    });
-  }
+  close?.addEventListener('click', () => { banner.style.display = 'none'; localStorage.setItem('iosPromptDismissed', '1'); });
 })();
 
-// ─── Keyboard Shortcuts ─────────────────────────────────────────
+// ─── iOS Loading Screen ──────────────────────────────────────────
+
+function showIOSLoadingScreen() {
+  const screen = document.getElementById('ios-loading-screen');
+  if (screen && isIOS && isStandalone) {
+    screen.style.display = 'flex';
+    setTimeout(() => {
+      screen.classList.add('hidden');
+      setTimeout(() => { screen.style.display = 'none'; }, 500);
+    }, 1500);
+  }
+}
+
+// ─── Keyboard Shortcuts ──────────────────────────────────────────
 
 document.addEventListener('keydown', (e) => {
   if (e.code === 'Space' && !e.target.matches('input, textarea')) {
     e.preventDefault();
-    
-    if (btnStart && !btnStart.disabled) {
-      btnStart.click();
-    } else if (btnStop && !btnStop.disabled) {
-      btnStop.click();
-    }
+    if (!btnStart?.disabled) btnStart?.click();
+    else if (!btnStop?.disabled) btnStop?.click();
   }
-  
-  if (e.code === 'Escape' && isTimerRunning()) {
-    if (btnStop) btnStop.click();
-  }
+  if (e.code === 'Escape' && isTimerRunning()) btnStop?.click();
 });
 
-// ─── Platform Setup ─────────────────────────────────────────────
-
-if (IS_IOS) {
-  log('iOS detected');
-  if (IS_STANDALONE) showLoadingScreen();
-  setupVisibilityHandler();
-}
-
-if (IS_ANDROID) {
-  log('Android detected');
-  if (IS_STANDALONE) showLoadingScreen();
-  setupVisibilityHandler();
-}
+// ─── Global Error Handlers ───────────────────────────────────────
 
 window.addEventListener('error', (e) => log('Global error:', e.message));
 window.addEventListener('unhandledrejection', (e) => log('Unhandled rejection:', e.reason));
 
-if (typeof window !== 'undefined') {
+// ─── Beforeunload Protection ─────────────────────────────────────
+// Prevent accidental page close during active meditation sessions.
+
+window.addEventListener('beforeunload', (e) => {
+  if (isTimerRunning()) {
+    e.preventDefault();
+    e.returnValue = '';
+  }
+});
+
+// ─── Page Lifecycle (iOS freeze/resume) ──────────────────────────
+// Supplement visibilitychange with pagehide/pageshow for iOS Safari
+// which may fire pagehide without visibilitychange when task-switching.
+
+window.addEventListener('pagehide', () => {
+  log('Page hidden (pagehide)');
+});
+
+window.addEventListener('pageshow', (e) => {
+  log('Page shown (pageshow), persisted:', e.persisted);
+  if (e.persisted) {
+    // Page was restored from bfcache — re-acquire audio if needed
+    unlockAudio().catch(() => {});
+  }
+});
+
+// ─── Dimmer Setting Sync ─────────────────────────────────────────
+// Listen for dimmer setting changes and update the module in real time.
+// This avoids settings.js having to know about screen-dimmer.js.
+
+// Dimmer sync: read directly from DOM to avoid state race condition.
+// Must be called AFTER settings.js has attached its own change handler.
+function setupDimmerSync() {
+  const dimmerSelect = document.getElementById('settings-dimmer');
+  if (!dimmerSelect) return;
+
+  function onDimmerChange() {
+    // Read directly from DOM element — always current, no state lag
+    setDimmerEnabled(dimmerSelect.value === 'on');
+  }
+
+  dimmerSelect.addEventListener('change', onDimmerChange);
+  if (isIOS) {
+    dimmerSelect.addEventListener('touchstart', onDimmerChange, { passive: true });
+  }
+
+  // Sync initial value on load
+  setDimmerEnabled(dimmerSelect.value === 'on');
+}
+
+// ─── Debug Helpers (development only) ────────────────────────────
+
+if (DEBUG && typeof window !== 'undefined') {
   window.SilentBell = {
+    getWakeLockInfo,
     isTimerRunning,
     saveToStorage,
     loadFromStorage,
-    preloadSoundSet,
-    unlockAudio
+    unlockAudio,
+    getAudioMode: async () => {
+      const { getAudioMode } = await import('./modules/audio.js');
+      return getAudioMode();
+    }
   };
 }
 
-// ─── Initialization ─────────────────────────────────────────────
+// ─── Initialization ──────────────────────────────────────────────
 
 function init() {
-  log('Initializing Silent Bell...');
-  log('Platform:', IS_IOS ? 'iOS' : IS_ANDROID ? 'Android' : 'Desktop');
-  log('Standalone:', IS_STANDALONE);
-  
+  log('Initializing Silent Bell v1.4.0...');
+  log('Platform:', isIOS ? 'iOS' : 'Desktop');
+  log('Standalone:', isStandalone);
+
   initI18n();
   loadFromStorage();
   initSettingsRefs();
   loadSettings(display);
   setupSettingsListeners(display);
+  setupDimmerSync();  // After settings listeners — reads DOM directly
   initDragHandler();
   saveToStorage();
-  
+
   // Preload default sound set
   preloadSoundSet('bell').catch(() => {});
-  
+
+  // iOS-specific setup
+  if (isIOS) {
+    showIOSLoadingScreen();
+    document.addEventListener('visibilitychange', () => {
+      if (document.visibilityState === 'visible') {
+        unlockAudio().catch(() => {});
+      }
+    });
+  }
+
   log('Silent Bell initialized');
 }
 
