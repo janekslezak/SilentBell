@@ -12,6 +12,7 @@ export function initSettingsRefs() {
   settingsRefs.prepare = document.getElementById('settings-prepare');
   settingsRefs.interval = document.getElementById('interval-select');
   settingsRefs.notes = document.getElementById('settings-notes');
+  settingsRefs.dimmer = document.getElementById('settings-dimmer');
 }
 
 export function loadSettings(displayEl) {
@@ -20,7 +21,8 @@ export function loadSettings(displayEl) {
   const prepare = get('settings.prepare') !== undefined ? get('settings.prepare') : 10;
   const interval = get('settings.interval') || 0;
   const notes = get('settings.notes') !== false;
-  
+  const dimmer = get('settings.dimmer') === true;
+
   if (settingsRefs.duration) {
     settingsRefs.duration.value = duration;
   }
@@ -40,7 +42,11 @@ export function loadSettings(displayEl) {
   if (settingsRefs.notes) {
     settingsRefs.notes.value = notes ? 'on' : 'off';
   }
-  
+
+  if (settingsRefs.dimmer) {
+    settingsRefs.dimmer.value = dimmer ? 'on' : 'off';
+  }
+
   if (displayEl) {
     const totalSeconds = duration * 60;
     const m = String(Math.floor(totalSeconds / 60)).padStart(2, '0');
@@ -106,6 +112,14 @@ export function setupSettingsListeners(displayEl) {
     settingsRefs.notes.addEventListener('change', () => {
       const value = settingsRefs.notes.value === 'on';
       set('settings.notes', value);
+      saveToStorage();
+    });
+  }
+
+  if (settingsRefs.dimmer) {
+    settingsRefs.dimmer.addEventListener('change', () => {
+      const value = settingsRefs.dimmer.value === 'on';
+      set('settings.dimmer', value);
       saveToStorage();
     });
   }

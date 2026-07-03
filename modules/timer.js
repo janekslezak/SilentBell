@@ -1,20 +1,29 @@
 // ─── Timer Module ────────────────────────────────────────────────
-// Meditation timer with countdown, interval bells, and session management.
+// Meditation timer with high-precision countdown using
+// requestAnimationFrame + timestamp comparison (no setInterval drift).
+//
+// Session lifecycle:
+//   startCountdown() → prepare phase → startSession() → RAF tick loop → completeSession()
+//                                       ↑                │
+//                                       └──── stopSession() ←──┘
 
 import { t } from './i18n.js';
-import { 
-  playStartSound, 
-  playIntervalSound, 
+import {
+  playStartSound,
+  playIntervalSound,
   playEndSound,
-  stopAllAudio
+  stopAllAudio,
+  startIOSSession,
+  stopIOSSession
 } from './audio.js';
 import { startSilentLoop, stopSilentLoop } from './silent-loop.js';
 import { saveSession, showNoteField } from './log.js';
-import { state, get, set } from './state.js';
+import { state, set, get } from './state.js';
 import { acquireWakeLock, releaseWakeLock } from './wakelock.js';
-import { IS_IOS, IS_ANDROID, TIMING, DEBUG } from './config.js';
+import { dimScreen, restoreScreen } from './screen-dimmer.js';
+import { isIOS } from './platform.js';
 
-let timerInterval = null;
+let rafId = null;
 let countdownInterval = null;
 let sessionStart = null;
 let endTimestamp = null;
@@ -22,10 +31,10 @@ let plannedDuration = 0;
 let intervalBellMs = 0;
 let nextIntervalAt = null;
 let wakeLockAcquired = false;
+let lastTickSecond = -1;
 
-function log(...args) {
-  if (DEBUG) console.log('[Timer]', ...args);
-}
+const DEBUG = false;
+function log(...args) { if (DEBUG) console.log('[Timer]', ...args); }
 
 export function getTimerState() {
   return {
@@ -38,122 +47,82 @@ export function getTimerState() {
   };
 }
 
-export function setCurrentSound(sound) {
-  set('audio.currentSound', sound);
-}
-
-export function setPrepareSeconds(secs) {
-  const value = Math.max(0, Math.min(60, parseInt(secs, 10) || 0));
-  set('timer.prepareSeconds', value);
-}
-
-export function setNotesEnabled(enabled) {
-  set('settings.notes', enabled);
-}
-
-export function setSelectedMinutes(mins) {
-  const value = Math.max(0, Math.min(480, parseInt(mins, 10) || 0));
-  set('timer.selectedMinutes', value);
-}
-
-export function setSelectedSeconds(secs) {
-  const value = Math.max(0, Math.min(59, parseInt(secs, 10) || 0));
-  set('timer.selectedSeconds', value);
-}
+export function setCurrentSound(sound) { set('audio.currentSound', sound); }
+export function setPrepareSeconds(secs) { set('timer.prepareSeconds', Math.max(0, Math.min(60, parseInt(secs, 10) || 0))); }
+export function setNotesEnabled(enabled) { set('settings.notes', enabled); }
+export function setSelectedMinutes(mins) { set('timer.selectedMinutes', Math.max(0, Math.min(480, parseInt(mins, 10) || 0))); }
+export function setSelectedSeconds(secs) { set('timer.selectedSeconds', Math.max(0, Math.min(59, parseInt(secs, 10) || 0))); }
 
 export function formatTime(secs) {
-  const totalSeconds = Math.abs(Math.floor(secs));
-  const m = String(Math.floor(totalSeconds / 60)).padStart(2, '0');
-  const s = String(totalSeconds % 60).padStart(2, '0');
+  const total = Math.abs(Math.floor(secs));
+  const m = String(Math.floor(total / 60)).padStart(2, '0');
+  const s = String(total % 60).padStart(2, '0');
   return `${m}:${s}`;
 }
 
 export function getTotalSeconds() {
-  const mins = get('timer.selectedMinutes') || 20;
-  const secs = get('timer.selectedSeconds') || 0;
-  return mins * 60 + secs;
+  return (get('timer.selectedMinutes') || 20) * 60 + (get('timer.selectedSeconds') || 0);
 }
 
 export function setTime(totalSecs, displayEl) {
   const clamped = Math.min(28800, Math.max(60, totalSecs));
   const mins = Math.floor(clamped / 60);
   const secs = clamped % 60;
-  
   set('timer.selectedMinutes', mins);
   set('timer.selectedSeconds', secs);
-  
-  if (displayEl) {
-    displayEl.textContent = formatTime(clamped);
-  }
+  if (displayEl) displayEl.textContent = formatTime(clamped);
 }
 
-export function changeTime(deltaSecs) {
-  if (timerInterval || countdownInterval) {
-    return false;
-  }
-  return true;
+export function changeTime() {
+  return !isTimerRunning();
 }
 
 export function isTimerRunning() {
-  return timerInterval !== null || countdownInterval !== null;
+  return rafId !== null || countdownInterval !== null;
 }
 
 function setMeditating(active) {
-  const viewTimer = document.getElementById('view-timer');
-  if (viewTimer) {
-    viewTimer.classList.toggle('meditating', active);
-  }
+  document.getElementById('view-timer')?.classList.toggle('meditating', active);
   document.body.classList.toggle('meditating', active);
-  
   set('timer.isRunning', active);
 }
+
+// ─── Preparation Countdown ───────────────────────────────────────
 
 export function startCountdown(displayEl, statusEl, btnStart, btnStop, onComplete) {
   const prepareSeconds = get('timer.prepareSeconds') || 10;
   let secsLeft = prepareSeconds;
-  
   wakeLockAcquired = false;
-  
-  if (secsLeft <= 0) {
-    onComplete();
-    return;
-  }
-  
+
+  if (secsLeft <= 0) { onComplete(); return; }
+
   if (btnStart) btnStart.disabled = true;
   if (btnStop) btnStop.disabled = false;
-  
-  const updateDisplay = () => {
-    if (statusEl) {
-      statusEl.textContent = t('status_prepare').replace('{secs}', secsLeft);
-    }
-    if (displayEl) {
-      displayEl.textContent = formatTime(secsLeft);
-    }
+
+  const update = () => {
+    if (statusEl) statusEl.textContent = t('status_prepare').replace('{secs}', secsLeft);
+    if (displayEl) displayEl.textContent = formatTime(secsLeft);
   };
-  
-  updateDisplay();
-  
+  update();
+
   countdownInterval = setInterval(() => {
     secsLeft--;
-    
     if (secsLeft <= 0) {
       clearInterval(countdownInterval);
       countdownInterval = null;
       onComplete();
     } else {
-      updateDisplay();
+      update();
     }
   }, 1000);
 }
 
 export function clearCountdown() {
-  if (countdownInterval) {
-    clearInterval(countdownInterval);
-    countdownInterval = null;
-    return true;
-  }
+  if (countdownInterval) { clearInterval(countdownInterval); countdownInterval = null; return true; }
   return false;
 }
+
+// ─── Main Session — RAF-based High Precision Timer ───────────────
 
 export async function startSession(displayEl, statusEl, btnStart, btnStop, intervalSelectValue, currentSound) {
   intervalBellMs = parseInt(intervalSelectValue, 10) * 60 * 1000 || 0;
@@ -161,20 +130,12 @@ export async function startSession(displayEl, statusEl, btnStart, btnStop, inter
   sessionStart = Date.now();
   endTimestamp = sessionStart + plannedDuration * 1000;
   nextIntervalAt = intervalBellMs > 0 ? sessionStart + intervalBellMs : null;
-  
+  lastTickSecond = -1;
+
   const sound = currentSound || get('audio.currentSound') || 'bell';
-  
   log('Starting session, duration:', plannedDuration, 'sound:', sound);
-  
-  if (!IS_IOS) {
-    startSilentLoop();
-  } else {
-    // For iOS, restart silent loop to ensure it continues
-    stopSilentLoop();
-    startSilentLoop();
-  }
-  
-  // Acquire wake lock
+
+  // Wake lock
   try {
     const method = await acquireWakeLock();
     wakeLockAcquired = true;
@@ -183,167 +144,142 @@ export async function startSession(displayEl, statusEl, btnStart, btnStop, inter
     log('Wake lock failed:', err.message);
     wakeLockAcquired = false;
   }
-  
-  // Play start sound
+
+  // Start sound
   try {
-    log('Playing start sound...');
     await playStartSound(sound);
-  } catch (error) {
-    log('Start sound error:', error.message);
-  }
-  
+  } catch (e) { log('Start sound error:', e.message); }
+
   if (statusEl) statusEl.textContent = t('status_meditating');
   if (btnStart) btnStart.disabled = true;
   if (btnStop) btnStop.disabled = false;
-  
+
   setMeditating(true);
-  
-  timerInterval = setInterval(() => {
-    tick(displayEl, statusEl, btnStart, btnStop, sound);
-  }, 1000);
+
+  // Dim screen after session begins (if setting enabled)
+  dimScreen();
+
+  // Start the RAF loop
+  tick(displayEl, statusEl, btnStart, btnStop, sound);
 }
 
 function tick(displayEl, statusEl, btnStart, btnStop, currentSound) {
   const now = Date.now();
-  const remaining = Math.max(0, Math.round((endTimestamp - now) / 1000));
-  
-  if (displayEl) {
-    displayEl.textContent = formatTime(remaining);
+  const remainingMs = endTimestamp - now;
+  const remaining = Math.max(0, Math.round(remainingMs / 1000));
+
+  // Only update display when the second changes (reduces DOM thrashing)
+  if (remaining !== lastTickSecond) {
+    lastTickSecond = remaining;
+    if (displayEl) displayEl.textContent = formatTime(remaining);
   }
-  
+
+  // Interval bell
   if (intervalBellMs > 0 && nextIntervalAt && now >= nextIntervalAt) {
-    try {
-      playIntervalSound(currentSound);
-    } catch (error) {
-      log('Interval bell failed:', error.message);
-    }
-    
+    try { playIntervalSound(currentSound); } catch {}
     nextIntervalAt += intervalBellMs;
-    if (nextIntervalAt >= endTimestamp) {
-      nextIntervalAt = null;
-    }
+    if (nextIntervalAt >= endTimestamp) nextIntervalAt = null;
   }
-  
+
+  // Session complete
   if (remaining <= 0) {
     completeSession(displayEl, statusEl, btnStart, btnStop, currentSound);
+    return;
   }
+
+  rafId = requestAnimationFrame(() => tick(displayEl, statusEl, btnStart, btnStop, currentSound));
 }
 
+// ─── Session Completion ──────────────────────────────────────────
+
 async function completeSession(displayEl, statusEl, btnStart, btnStop, currentSound) {
-  clearInterval(timerInterval);
-  timerInterval = null;
-  
+  rafId = null;
   setMeditating(false);
-  
+  restoreScreen();
+
   const sound = currentSound || get('audio.currentSound') || 'bell';
-  
   log('Session complete, playing end sound:', sound);
-  
+
   try {
     await playEndSound(sound);
     log('End sound completed');
-  } catch (error) {
-    log('End sound error:', error.message);
-  }
-  
-  // Use CONFIG for cleanup delays
-  const cleanupDelay = IS_IOS ? TIMING.AUDIO_CLEANUP.IOS : TIMING.AUDIO_CLEANUP.ANDROID;
-  const wakeLockDelay = IS_IOS ? TIMING.WAKE_LOCK_RELEASE.IOS : TIMING.WAKE_LOCK_RELEASE.ANDROID;
-  
-  log('Scheduling cleanup in', cleanupDelay, 'ms');
-  
-  // Wait for end sound to finish naturally before cleaning up audio
+  } catch (e) { log('End sound error:', e.message); }
+
+  // Platform-specific cleanup delays
+  const cleanupDelay = isIOS ? 12000 : 20000;
+  const wakeLockDelay = isIOS ? 10000 : 18000;
+
   setTimeout(() => {
     stopSilentLoop();
+    stopIOSSession();
     stopAllAudio();
     log('Audio cleanup completed');
   }, cleanupDelay);
-  
+
   if (wakeLockAcquired) {
     setTimeout(async () => {
-      try {
-        await releaseWakeLock();
-        wakeLockAcquired = false;
-        log('Wake lock released');
-      } catch (e) {
-        log('Error releasing wake lock:', e.message);
-      }
+      try { await releaseWakeLock(); wakeLockAcquired = false; log('Wake lock released'); }
+      catch (e) { log('Wake lock release error:', e.message); }
     }, wakeLockDelay);
   }
-  
+
+  // Notes
   const notesEnabled = get('settings.notes') !== false;
-  
-  if (notesEnabled) {
-    showNoteField(true, undefined);
-  } else {
-    saveSession(true, undefined, '');
-  }
-  
+  if (notesEnabled) { showNoteField(true, undefined); }
+  else { saveSession(true, undefined, ''); }
+
   if (statusEl) statusEl.textContent = t('status_complete');
-  if (btnStart) {
-    btnStart.disabled = false;
-    btnStart.textContent = t('btn_start');
-  }
+  if (btnStart) { btnStart.disabled = false; btnStart.textContent = t('btn_start'); }
   if (btnStop) btnStop.disabled = true;
   if (displayEl) displayEl.textContent = formatTime(plannedDuration);
 }
 
+// ─── Stop Session ────────────────────────────────────────────────
+
 export function stopSession(displayEl, statusEl, btnStart, btnStop) {
   log('Stopping session...');
-  
+
+  // Stop countdown if active
   if (countdownInterval) {
     clearInterval(countdownInterval);
     countdownInterval = null;
-    
-    if (wakeLockAcquired) {
-      releaseWakeLock().catch(() => {});
-      wakeLockAcquired = false;
-    }
-    
-    stopSilentLoop();
-    stopAllAudio();
-    
-    if (statusEl) statusEl.textContent = t('status_ready');
-    if (btnStart) btnStart.disabled = false;
-    if (btnStop) btnStop.disabled = true;
-    if (displayEl) displayEl.textContent = formatTime(getTotalSeconds());
-    
+    cleanupAfterStop(displayEl, statusEl, btnStart, btnStop, false);
     return { stopped: true, early: false };
   }
-  
-  if (!timerInterval) {
-    return { stopped: false };
-  }
-  
-  clearInterval(timerInterval);
-  timerInterval = null;
-  
+
+  if (!rafId) return { stopped: false };
+
+  cancelAnimationFrame(rafId);
+  rafId = null;
   setMeditating(false);
-  
+  cleanupAfterStop(displayEl, statusEl, btnStart, btnStop, true);
+
+  const actual = Math.round((Date.now() - sessionStart) / 1000);
+  return { stopped: true, early: true, actual };
+}
+
+function cleanupAfterStop(displayEl, statusEl, btnStart, btnStop, wasEarly) {
+  restoreScreen();
+
   if (wakeLockAcquired) {
     releaseWakeLock().catch(() => {});
     wakeLockAcquired = false;
   }
-  
   stopSilentLoop();
+  stopIOSSession();
   stopAllAudio();
-  
-  const actual = Math.round((Date.now() - sessionStart) / 1000);
-  const notesEnabled = get('settings.notes') !== false;
-  
-  if (notesEnabled) {
-    showNoteField(false, actual);
+
+  if (wasEarly) {
+    const actual = Math.round((Date.now() - sessionStart) / 1000);
+    const notesEnabled = get('settings.notes') !== false;
+    if (notesEnabled) { showNoteField(false, actual); }
+    else { saveSession(false, actual, ''); }
+    if (statusEl) statusEl.textContent = t('status_stopped');
   } else {
-    saveSession(false, actual, '');
+    if (statusEl) statusEl.textContent = t('status_ready');
   }
-  
-  if (statusEl) statusEl.textContent = t('status_stopped');
-  if (btnStart) {
-    btnStart.disabled = false;
-    btnStart.textContent = t('btn_start');
-  }
+
+  if (btnStart) { btnStart.disabled = false; btnStart.textContent = t('btn_start'); }
   if (btnStop) btnStop.disabled = true;
   if (displayEl) displayEl.textContent = formatTime(plannedDuration);
-  
-  return { stopped: true, early: true, actual };
 }

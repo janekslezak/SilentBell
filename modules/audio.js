@@ -1,189 +1,229 @@
-// ─── Audio Engine Module ─────────────────────────────────────────
-// Unified audio system with iOS-specific handling.
+// ─── Audio Module ────────────────────────────────────────────────
+// Audio system with platform-aware playback.
+// Strategy: MP3 files everywhere — proven to work on all platforms.
+//
+// iOS: Uses ios-audio.js which primes Audio elements during user gesture.
+// Non-iOS: Uses standard HTML5 Audio with element caching.
+//
+// Both paths use the same MP3 sound files from /sounds/.
 
-import { 
-  playStartSound as playIOSStart,
-  playIntervalSound as playIOSInterval,
-  playEndSound as playIOSEnd,
-  playSingleSound as playIOSSingle,
-  primeAudio as primeIOSAudio,
-  stopAllAudio as stopIOSAudio,
-  startIOSSession,
-  stopIOSSession,
-  isIOSSessionActive
-} from './ios-audio.js';
+import { isIOS } from './platform.js';
 
-const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent) && !window.MSStream;
+const DEBUG = false;
+function log(...args) { if (DEBUG) console.log('[Audio]', ...args); }
 
-const DEBUG = true;
-function log(...args) {
-  if (DEBUG) console.log('[Audio]', ...args);
+// ─── MP3 File Registry ───────────────────────────────────────────
+
+const AUDIO_FILES = {
+  bell: {
+    start:    'sounds/sequence_bell_start.mp3',
+    interval: 'sounds/sequence_bell_interval.mp3',
+    end:      'sounds/sequence_bell_end.mp3',
+    single:   'sounds/temple_bell_standard.mp3'
+  },
+  'bell-high': {
+    start:    'sounds/sequence_bell_high_start.mp3',
+    interval: 'sounds/sequence_bell_high_interval.mp3',
+    end:      'sounds/sequence_bell_high_end.mp3',
+    single:   'sounds/temple_bell_high.mp3'
+  },
+  chugpi: {
+    start:    'sounds/sequence_chugpi_start.mp3',
+    interval: 'sounds/sequence_chugpi_interval.mp3',
+    end:      'sounds/sequence_chugpi_end.mp3',
+    single:   'sounds/chugpi.mp3'
+  }
+};
+
+// ─── iOS Audio (primed MP3 elements) ─────────────────────────────
+
+let iosAudioElements = {};
+let iosPrimed = false;
+
+function initIOSElements() {
+  if (!isIOS || Object.keys(iosAudioElements).length > 0) return;
+  Object.keys(AUDIO_FILES).forEach(type => {
+    iosAudioElements[type] = {};
+    ['start', 'interval', 'end'].forEach(key => {
+      const a = new Audio();
+      a.src = AUDIO_FILES[type][key];
+      a.preload = 'auto';
+      iosAudioElements[type][key] = a;
+    });
+  });
+  log('iOS audio elements initialized');
 }
+
+export function primeAudio(soundType) {
+  if (!isIOS) return;
+  initIOSElements();
+  const type = soundType || 'bell';
+  log('Priming iOS audio for:', type);
+
+  ['start', 'interval', 'end'].forEach(key => {
+    const a = iosAudioElements[type]?.[key];
+    if (!a) return;
+    a.muted = true;
+    a.volume = 0;
+    a.currentTime = 0;
+    const p = a.play();
+    if (p !== undefined) {
+      p.then(() => {
+        a.pause();
+        a.currentTime = 0;
+        a.muted = false;
+        a.volume = (key === 'interval') ? 0.8 : 1.0;
+      }).catch(() => {
+        a.muted = false;
+        a.volume = (key === 'interval') ? 0.8 : 1.0;
+      });
+    }
+  });
+  iosPrimed = true;
+}
+
+async function playIOS(type, key) {
+  if (!isIOS) return false;
+  const a = iosAudioElements[type]?.[key];
+  if (!a) return false;
+  a.currentTime = 0;
+  a.muted = false;
+  a.volume = (key === 'interval') ? 0.8 : 1.0;
+  try { await a.play(); return true; } catch { return false; }
+}
+
+function stopIOS() {
+  if (!isIOS) return;
+  Object.values(iosAudioElements).forEach(typeObj => {
+    Object.values(typeObj).forEach(a => {
+      try { a.pause(); a.currentTime = 0; a.muted = false; } catch {}
+    });
+  });
+}
+
+// ─── Standard HTML5 Audio (non-iOS) ──────────────────────────────
 
 const audioCache = new Map();
 let isLoading = false;
 
-const AUDIO_FILES = {
-  'bell': {
-    start: 'sounds/sequence_bell_start.mp3',
-    interval: 'sounds/sequence_bell_interval.mp3',
-    end: 'sounds/sequence_bell_end.mp3',
-    single: 'sounds/temple_bell_standard.mp3'
-  },
-  'bell-high': {
-    start: 'sounds/sequence_bell_high_start.mp3',
-    interval: 'sounds/sequence_bell_high_interval.mp3',
-    end: 'sounds/sequence_bell_high_end.mp3',
-    single: 'sounds/temple_bell_high.mp3'
-  },
-  'chugpi': {
-    start: 'sounds/sequence_chugpi_start.mp3',
-    interval: 'sounds/sequence_chugpi_interval.mp3',
-    end: 'sounds/sequence_chugpi_end.mp3',
-    single: 'sounds/chugpi.mp3'
-  }
-};
-
-export function isAudioLoading() {
-  return isLoading;
-}
-
-function getAudioElement(src) {
-  if (audioCache.has(src)) {
-    return audioCache.get(src);
-  }
-  const audio = new Audio(src);
-  audio.preload = 'auto';
-  audio.loop = false;
-  audioCache.set(src, audio);
-  return audio;
+function getCachedAudio(src) {
+  if (audioCache.has(src)) return audioCache.get(src);
+  const a = new Audio(src);
+  a.preload = 'auto';
+  a.loop = false;
+  audioCache.set(src, a);
+  return a;
 }
 
 export async function preloadAudio(src) {
   return new Promise((resolve) => {
-    const audio = getAudioElement(src);
-    if (audio.readyState >= 3) {
-      resolve(audio);
-      return;
-    }
-    const timeoutId = setTimeout(() => resolve(audio), 5000);
-    audio.addEventListener('canplaythrough', () => {
-      clearTimeout(timeoutId);
-      resolve(audio);
-    }, { once: true });
-    audio.addEventListener('error', () => {
-      clearTimeout(timeoutId);
-      resolve(audio);
-    }, { once: true });
+    const audio = getCachedAudio(src);
+    if (audio.readyState >= 3) { resolve(audio); return; }
+    const timeout = setTimeout(() => resolve(audio), 5000);
+    audio.addEventListener('canplaythrough', () => { clearTimeout(timeout); resolve(audio); }, { once: true });
+    audio.addEventListener('error', () => { clearTimeout(timeout); resolve(audio); }, { once: true });
     audio.load();
   });
 }
 
 export async function preloadSoundSet(soundType) {
-  if (isIOS) return;
-  
+  if (isIOS) {
+    // On iOS, prime during user gesture instead of preloading
+    primeAudio(soundType);
+    return;
+  }
   const files = AUDIO_FILES[soundType];
   if (!files) return;
-  
   isLoading = true;
-  log('Preloading:', soundType);
-  
   try {
-    await Promise.all([
-      preloadAudio(files.start),
-      preloadAudio(files.interval),
-      preloadAudio(files.end)
-    ]);
+    await Promise.all([preloadAudio(files.start), preloadAudio(files.interval), preloadAudio(files.end)]);
     log('Preloaded:', soundType);
-  } catch (error) {
-    log('Preload error:', error.message);
+  } catch (e) {
+    log('Preload error:', e.message);
   } finally {
     isLoading = false;
   }
 }
 
-async function playStandardAudio(src, volume = 1.0) {
+async function playStandard(type, key) {
+  if (isIOS) return false;
+  const files = AUDIO_FILES[type] || AUDIO_FILES.bell;
+  const src = files[key];
+  if (!src) return false;
   try {
-    const audio = getAudioElement(src);
-    audio.volume = volume;
-    audio.currentTime = 0;
-    await audio.play();
-    log('Playing:', src);
+    const a = getCachedAudio(src);
+    a.volume = (key === 'interval') ? 0.8 : 1.0;
+    a.currentTime = 0;
+    await a.play();
     return true;
-  } catch (error) {
-    log('Playback failed:', error.message);
+  } catch (e) {
+    log('Playback failed:', e.message);
     return false;
   }
 }
 
-// New function: Prime the audio for iOS
-export function primeAudio(soundType) {
-  if (isIOS) {
-    primeIOSAudio(soundType);
-  }
-}
+// ─── Unified Public API ──────────────────────────────────────────
 
 export async function playStartSound(type) {
   if (type === 'none') return;
-  log('playStartSound:', type);
-  
-  if (isIOS) {
-    return await playIOSStart(type);
-  }
-  
-  const files = AUDIO_FILES[type] || AUDIO_FILES['bell'];
-  await playStandardAudio(files.start, 1.0);
+  log('playStartSound:', type, 'iOS:', isIOS);
+  if (isIOS) { await playIOS(type, 'start'); return; }
+  await playStandard(type, 'start');
 }
 
 export async function playIntervalSound(type) {
   if (type === 'none') return;
-  
-  if (isIOS) {
-    return await playIOSInterval(type);
-  }
-  
-  const files = AUDIO_FILES[type] || AUDIO_FILES['bell'];
-  await playStandardAudio(files.interval, 0.8);
+  if (isIOS) { await playIOS(type, 'interval'); return; }
+  await playStandard(type, 'interval');
 }
 
 export async function playEndSound(type) {
   if (type === 'none') return;
-  log('playEndSound:', type);
-  
-  if (isIOS) {
-    return await playIOSEnd(type);
-  }
-  
-  const files = AUDIO_FILES[type] || AUDIO_FILES['bell'];
-  await playStandardAudio(files.end, 1.0);
+  log('playEndSound:', type, 'iOS:', isIOS);
+  if (isIOS) { await playIOS(type, 'end'); return; }
+  await playStandard(type, 'end');
 }
 
 export async function playSingleSound(type) {
-  if (type === 'none') return;
-  
+  if (!type || type === 'none') return;
   if (isIOS) {
-    return await playIOSSingle(type);
+    const src = AUDIO_FILES[type]?.single || AUDIO_FILES.bell.single;
+    try {
+      const a = new Audio(src);
+      a.muted = false;
+      a.volume = 1.0;
+      await a.play();
+    } catch {}
+    return;
   }
-  
-  const files = AUDIO_FILES[type] || AUDIO_FILES['bell'];
-  await playStandardAudio(files.single, 1.0);
+  await playStandard(type, 'single');
 }
 
 export function stopAllAudio() {
-  stopIOSAudio();
-  audioCache.forEach(audio => {
-    try {
-      audio.pause();
-      audio.currentTime = 0;
-    } catch (e) {}
+  stopIOS();
+  audioCache.forEach(a => {
+    try { a.pause(); a.currentTime = 0; } catch {}
   });
 }
 
-export { startIOSSession, stopIOSSession, isIOSSessionActive };
+export async function startIOSSession() { return true; }
+export function stopIOSSession() { stopIOS(); }
+export function isIOSSessionActive() { return iosPrimed; }
 
-// Legacy compatibility
-export function playSilentUnlock() {
-  // No-op, use primeAudio instead
+export function isAudioLoading() { return isLoading; }
+
+// ─── Unlock (called on first user interaction) ───────────────────
+
+export async function unlockAudio() {
+  // Play a silent sound to unlock the audio subsystem.
+  // Uses a timeout to prevent the promise from hanging on iOS
+  // when called outside the main start-button user gesture.
+  try {
+    const a = new Audio('data:audio/wav;base64,UklGRigAAABXQVZFZm10IBIAAAABAAEARKwAAIhYAQACABAAAABkYXRhAgAAAAEA');
+    a.volume = 0.001;
+    await Promise.race([
+      a.play(),
+      new Promise((_, reject) => setTimeout(() => reject(new Error('Unlock timeout')), 500))
+    ]);
+  } catch {}
 }
-
-log('Audio module loaded, isIOS:', isIOS);

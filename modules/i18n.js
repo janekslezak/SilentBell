@@ -24,7 +24,7 @@ const translations = {
     status_error: 'Error - tap to retry',
     settings_duration: 'Default duration (min)',
     settings_sound: 'Sound',
-    settings_interval: 'Interval sound (min)',
+    settings_interval: 'Interval bell (min)',
     settings_prepare: 'Prepare countdown (sec)',
     settings_notes: 'Session notes',
     notes_on: 'Enabled',
@@ -42,6 +42,12 @@ const translations = {
     log_manual: 'manual',
     log_days: 'days',
     log_avg_daily: 'Avg daily',
+    log_avg_daily_all: 'Avg daily (all days)',
+    log_include_empty: 'Include days with no meditation',
+    settings_dimmer: 'Dim screen during meditation',
+    dimmer_on: 'Enabled',
+    dimmer_off: 'Disabled',
+    dimmer_hint: 'Tap to view timer',
     chart_last7: 'Last 7 days',
     chart_avg_weekday: 'Avg / weekday',
     note_placeholder: 'Notes (optional)',
@@ -58,7 +64,7 @@ const translations = {
     ios_install: 'To install: tap Share then "Add to Home Screen"'
   },
   pl: {
-    nav_timer: 'Minutnik',
+    nav_timer: 'Timer',
     nav_log: 'Dziennik',
     nav_settings: 'Ustawienia',
     btn_start: 'Start',
@@ -97,6 +103,12 @@ const translations = {
     log_manual: 'ręcznie',
     log_days: 'dni',
     log_avg_daily: 'Śr. dzienna',
+    log_avg_daily_all: 'Śr. dzienna (wszystkie dni)',
+    log_include_empty: 'Uwzględnij dni bez medytacji',
+    settings_dimmer: 'Przyciemnij ekran podczas medytacji',
+    dimmer_on: 'Włączone',
+    dimmer_off: 'Wyłączone',
+    dimmer_hint: 'Dotknij, by zobaczyć timer',
     chart_last7: 'Ostatnie 7 dni',
     chart_avg_weekday: 'Śr. / dzień tyg.',
     note_placeholder: 'Notatki (opcjonalnie)',
@@ -152,6 +164,12 @@ const translations = {
     log_manual: '수동',
     log_days: '일',
     log_avg_daily: '일일 평균',
+    log_avg_daily_all: '일일 평균 (전체 일수)',
+    log_include_empty: '명상하지 않은 날 포함',
+    settings_dimmer: '명상 중 화면 어둡게',
+    dimmer_on: '사용',
+    dimmer_off: '사용 안함',
+    dimmer_hint: '타이머 복원 터치',
     chart_last7: '최근 7일',
     chart_avg_weekday: '요일별 평균',
     note_placeholder: '세션은 어땠나요?',
@@ -170,20 +188,12 @@ const translations = {
 };
 
 let currentLang = localStorage.getItem('lang') || 'en';
-
-// Ensure currentLang is valid
-if (!translations[currentLang]) {
-  currentLang = 'en';
-}
+if (!translations[currentLang]) currentLang = 'en';
 
 export function t(key) {
   return translations[currentLang]?.[key] || translations.en[key] || key;
 }
-
-export function getCurrentLang() {
-  return currentLang;
-}
-
+export function getCurrentLang() { return currentLang; }
 export function setLang(lang) {
   if (translations[lang]) {
     currentLang = lang;
@@ -200,11 +210,7 @@ function updatePageText() {
 }
 
 export function initI18n() {
-  // Ensure valid language
-  if (!translations[currentLang]) {
-    currentLang = 'en';
-    localStorage.setItem('lang', 'en');
-  }
+  if (!translations[currentLang]) { currentLang = 'en'; localStorage.setItem('lang', 'en'); }
   updatePageText();
 }
 
