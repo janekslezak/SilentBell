@@ -271,9 +271,6 @@ if (langButton) {
   }
 
   langButton.addEventListener('click', handleLangSwitch);
-  if (isIOS) {
-    langButton.addEventListener('touchstart', handleLangSwitch, { passive: true });
-  }
   langButton.textContent = langLabels[getCurrentLang()] || 'EN';
 }
 
@@ -306,9 +303,6 @@ if (themeButton) {
   }
 
   themeButton.addEventListener('click', handleThemeSwitch);
-  if (isIOS) {
-    themeButton.addEventListener('touchstart', handleThemeSwitch, { passive: true });
-  }
 }
 
 // ─── iOS Install Banner ──────────────────────────────────────────
@@ -396,9 +390,6 @@ function setupDimmerSync() {
   }
 
   dimmerSelect.addEventListener('change', onDimmerChange);
-  if (isIOS) {
-    dimmerSelect.addEventListener('touchstart', onDimmerChange, { passive: true });
-  }
 
   // Sync initial value on load
   setDimmerEnabled(dimmerSelect.value === 'on');

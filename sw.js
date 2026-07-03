@@ -1,4 +1,4 @@
-const CACHE = 'silent-bell-v20';
+const CACHE = 'silent-bell-v21';
 const ASSETS = [
   '/',
   'index.html',
